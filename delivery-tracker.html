@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Implementation Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ─── RESET & ROOT ─────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --white:#ffffff;--gray-25:#fafbfd;--gray-50:#f7f8fc;--gray-100:#f1f3f9;--gray-150:#eaecf4;
+  --gray-200:#e2e5f0;--gray-300:#c8cddf;--gray-400:#9aa1bb;--gray-500:#6b748f;--gray-600:#4a5168;
+  --gray-700:#333a52;--gray-800:#1e2336;--gray-900:#12172a;
+  --blue-50:#eff4ff;--blue-100:#dce8ff;--blue-500:#3b6dff;--blue-600:#2d5ce8;--blue-700:#1e45c8;
+  --green-50:#ecfdf5;--green-100:#d1fae5;--green-500:#10b981;--green-600:#059669;--green-700:#047857;
+  --amber-50:#fffbeb;--amber-100:#fef3c7;--amber-500:#f59e0b;--amber-600:#d97706;--amber-700:#b45309;
+  --red-50:#fff1f2;--red-100:#ffe4e6;--red-400:#fb7185;--red-500:#ef4444;--red-600:#dc2626;--red-700:#b91c1c;
+  --purple-50:#f5f3ff;--purple-100:#ede9fe;--purple-500:#8b5cf6;--purple-700:#6d28d9;
+  --cyan-50:#ecfeff;--cyan-100:#cffafe;--cyan-500:#06b6d4;--cyan-700:#0e7490;
+  --orange-50:#fff7ed;--orange-100:#ffedd5;--orange-500:#f97316;--orange-600:#ea580c;
+  --teal-50:#f0fdfa;--teal-500:#14b8a6;--teal-700:#0f766e;
+  --font:'Plus Jakarta Sans',sans-serif;--mono:'JetBrains Mono',monospace;
+  --radius-sm:6px;--radius:8px;--radius-lg:12px;--radius-xl:16px;
+  --shadow-sm:0 1px 3px rgba(20,30,60,.05),0 1px 2px rgba(20,30,60,.03);
+  --shadow:0 4px 14px rgba(20,30,60,.07),0 2px 4px rgba(20,30,60,.04);
+  --shadow-lg:0 16px 40px rgba(20,30,60,.13),0 4px 10px rgba(20,30,60,.06);
+  --sidebar:248px;
+}
+html,body{height:100%;font-family:var(--font);font-size:13px;color:var(--gray-700);background:var(--gray-50);line-height:1.55;-webkit-font-smoothing:antialiased}
+input,select,textarea,button{font-family:var(--font)}
+button{cursor:pointer}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--gray-200);border-radius:10px}
+select option{background:#fff;color:var(--gray-700)}
+a{color:var(--blue-600);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ─── LAYOUT ─────────────────────────────────────────────── */
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:var(--sidebar);min-width:var(--sidebar);background:var(--white);border-right:1px solid var(--gray-150);display:flex;flex-direction:column;overflow-y:auto;z-index:60}
+.main{flex:1;overflow-y:auto;background:var(--gray-50)}
+.scrim{display:none;position:fixed;inset:0;background:rgba(12,18,40,.4);z-index:55}
+
+/* ─── TOPBAR (mobile) ─────────────────────────────────────── */
+.topbar{display:none;align-items:center;gap:12px;padding:12px 16px;background:var(--white);border-bottom:1px solid var(--gray-150);position:sticky;top:0;z-index:40}
+.hamburger{width:38px;height:38px;border-radius:var(--radius);border:1px solid var(--gray-200);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--gray-600)}
+.topbar-title{font-size:15px;font-weight:800;color:var(--gray-900)}
+.store-badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:4px 9px;border-radius:20px;background:var(--gray-100);color:var(--gray-500);border:1px solid var(--gray-200);margin-bottom:8px;width:fit-content}
+.store-badge.cloud{background:var(--teal-50);color:var(--teal-700);border-color:var(--teal-50)}
+
+/* ─── SIDEBAR ──────────────────────────────────────────────── */
+.sb-brand{padding:20px 18px 16px;border-bottom:1px solid var(--gray-100)}
+.sb-logo{display:flex;align-items:center;gap:10px}
+.sb-logo-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--blue-500),var(--blue-700));display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:800;letter-spacing:-1px;flex-shrink:0}
+.sb-logo-text{font-size:15px;font-weight:800;color:var(--gray-900);letter-spacing:-0.5px;line-height:1.1}
+.sb-logo-sub{font-size:10px;color:var(--gray-400);letter-spacing:.3px;margin-top:2px}
+.sb-nav{flex:1}
+.sb-section{padding:16px 14px 6px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gray-400)}
+.sb-item{display:flex;align-items:center;gap:11px;padding:9px 14px;margin:1px 9px;border-radius:var(--radius);cursor:pointer;color:var(--gray-500);font-size:12.5px;font-weight:500;transition:all .15s;position:relative}
+.sb-item:hover{background:var(--gray-50);color:var(--gray-700)}
+.sb-item.active{background:var(--blue-50);color:var(--blue-600);font-weight:600}
+.sb-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;background:var(--blue-500);border-radius:0 2px 2px 0}
+.sb-icon{width:18px;text-align:center;font-size:15px;flex-shrink:0}
+.sb-badge{margin-left:auto;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:var(--red-100);color:var(--red-600)}
+.sb-badge.warn{background:var(--amber-100);color:var(--amber-600)}
+.sb-badge.neutral{background:var(--gray-100);color:var(--gray-500)}
+.sb-divider{height:1px;background:var(--gray-100);margin:8px 16px}
+.sb-footer{margin-top:auto;padding:10px 9px 16px;border-top:1px solid var(--gray-100)}
+.sb-footer .sb-item{font-size:12px}
+.sb-today{font-size:11px;color:var(--gray-400);text-align:center;margin-top:8px}
+.sb-today strong{color:var(--gray-600);display:block;font-size:12px;margin-bottom:2px}
+
+/* ─── PAGE AREA ─────────────────────────────────────────── */
+.page{display:none;padding:26px 30px;min-height:100%;max-width:1400px}
+.page.active{display:block}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap}
+.page-title{font-size:21px;font-weight:800;color:var(--gray-900);letter-spacing:-0.5px}
+.page-sub{font-size:12.5px;color:var(--gray-400);margin-top:4px;font-weight:400}
+.page-actions{display:flex;gap:8px;flex-shrink:0;align-items:center;flex-wrap:wrap}
+
+/* ─── BUTTONS ──────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--radius);font-size:12.5px;font-weight:600;border:1.5px solid transparent;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--blue-500);color:#fff;border-color:var(--blue-500)}
+.btn-primary:hover{background:var(--blue-600);border-color:var(--blue-600)}
+.btn-secondary{background:var(--white);color:var(--gray-600);border-color:var(--gray-200)}
+.btn-secondary:hover{background:var(--gray-50);border-color:var(--gray-300)}
+.btn-danger{background:var(--white);color:var(--red-600);border-color:var(--red-100)}
+.btn-danger:hover{background:var(--red-50)}
+.btn-success{background:var(--white);color:var(--green-600);border-color:var(--green-100)}
+.btn-success:hover{background:var(--green-50)}
+.btn-sm{padding:6px 11px;font-size:11.5px}
+.btn-xs{padding:4px 9px;font-size:11px}
+
+/* ─── CARDS ─────────────────────────────────────────────── */
+.card{background:var(--white);border:1px solid var(--gray-150);border-radius:var(--radius-xl);box-shadow:var(--shadow-sm)}
+.card-pad{padding:22px}
+.section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px}
+.section-title{font-size:13.5px;font-weight:700;color:var(--gray-800)}
+.section-count{font-size:12px;color:var(--gray-400);font-weight:500}
+
+/* ─── METRICS ───────────────────────────────────────────── */
+.metric-grid{display:grid;gap:13px;margin-bottom:22px}
+.metric-grid-4{grid-template-columns:repeat(4,1fr)}
+.metric-grid-3{grid-template-columns:repeat(3,1fr)}
+.metric-card{background:var(--white);border:1px solid var(--gray-150);border-radius:var(--radius-lg);padding:16px 18px;position:relative;overflow:hidden;box-shadow:var(--shadow-sm)}
+.metric-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.metric-card.blue::after{background:var(--blue-500)}.metric-card.green::after{background:var(--green-500)}
+.metric-card.amber::after{background:var(--amber-500)}.metric-card.red::after{background:var(--red-500)}
+.metric-card.purple::after{background:var(--purple-500)}.metric-card.cyan::after{background:var(--cyan-500)}
+.metric-card.orange::after{background:var(--orange-500)}.metric-card.teal::after{background:var(--teal-500)}
+.metric-card.gray::after{background:var(--gray-300)}
+.metric-label{font-size:10.5px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px}
+.metric-value{font-size:26px;font-weight:800;color:var(--gray-900);letter-spacing:-1px;line-height:1}
+.metric-sub{font-size:10.5px;color:var(--gray-400);margin-top:5px}
+.metric-icon{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:26px;opacity:.07}
+
+/* ─── STATUS PILLS ─────────────────────────────────────── */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.pill-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.pill.active{background:var(--green-50);color:var(--green-600)}.pill.active .pill-dot{background:var(--green-500)}
+.pill.waiting{background:var(--amber-50);color:var(--amber-600)}.pill.waiting .pill-dot{background:var(--amber-500)}
+.pill.stuck{background:var(--red-50);color:var(--red-600)}.pill.stuck .pill-dot{background:var(--red-500);animation:blink 1.5s infinite}
+.pill.stabilizing{background:var(--purple-50);color:var(--purple-500)}.pill.stabilizing .pill-dot{background:var(--purple-500)}
+.pill.idle{background:var(--gray-100);color:var(--gray-500)}.pill.idle .pill-dot{background:var(--gray-400)}
+.pill.onhold{background:var(--orange-50);color:var(--orange-600)}.pill.onhold .pill-dot{background:var(--orange-500)}
+.pill.postlive{background:var(--teal-50);color:var(--teal-700)}.pill.postlive .pill-dot{background:var(--teal-500)}
+.pill.completed{background:var(--cyan-50);color:var(--cyan-700)}.pill.completed .pill-dot{background:var(--cyan-500)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.tag{display:inline-flex;padding:2px 8px;border-radius:5px;font-size:10.5px;font-weight:600}
+.tag-critical{background:var(--red-500);color:#fff}.tag-high{background:var(--red-50);color:var(--red-600)}
+.tag-medium{background:var(--amber-50);color:var(--amber-600)}.tag-low{background:var(--gray-100);color:var(--gray-500)}
+.tag-done{background:var(--green-50);color:var(--green-600)}
+
+/* ─── AVATARS ──────────────────────────────────────────── */
+.avt{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid var(--white);flex-shrink:0}
+.avt-lg{width:38px;height:38px;font-size:13px}
+.avt-row{display:flex}.avt-row .avt{margin-left:-6px}.avt-row .avt:first-child{margin-left:0}
+
+/* ─── TABLE ─────────────────────────────────────────────── */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.data-table{width:100%;border-collapse:separate;border-spacing:0}
+.data-table th{padding:10px 14px;text-align:left;font-size:10.5px;font-weight:700;color:var(--gray-400);letter-spacing:.5px;text-transform:uppercase;background:var(--gray-50);border-bottom:1px solid var(--gray-150);white-space:nowrap}
+.data-table td{padding:12px 14px;border-bottom:1px solid var(--gray-100);vertical-align:middle;font-size:12.5px}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:var(--gray-25)}
+.data-table .bold{font-weight:600;color:var(--gray-800)}
+
+/* ─── PROJECT CARDS ────────────────────────────────────── */
+.proj-card{background:var(--white);border:1px solid var(--gray-150);border-radius:var(--radius-lg);margin-bottom:11px;overflow:hidden;box-shadow:var(--shadow-sm);transition:box-shadow .15s;border-left:4px solid transparent}
+.proj-card:hover{box-shadow:var(--shadow)}
+.proj-card.active{border-left-color:var(--green-500)}.proj-card.stuck{border-left-color:var(--red-500)}
+.proj-card.waiting{border-left-color:var(--amber-500)}.proj-card.onhold{border-left-color:var(--orange-500)}
+.proj-card.stabilizing{border-left-color:var(--purple-500)}.proj-card.idle{border-left-color:var(--gray-300)}
+.proj-card.postlive{border-left-color:var(--teal-500)}.proj-card.completed{border-left-color:var(--cyan-500)}
+.proj-row{display:flex;align-items:center;gap:16px;padding:15px 18px;cursor:pointer}
+.proj-name-block{flex:1;min-width:0}
+.proj-name-block .pname{font-size:14px;font-weight:700;color:var(--gray-900);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.proj-name-block .pphase{font-size:11.5px;color:var(--gray-400);margin-top:3px}
+.proj-meta-col{font-size:11.5px;text-align:left;min-width:84px}
+.proj-meta-col .lbl{font-size:9.5px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.proj-meta-col .val{font-weight:600;color:var(--gray-700);font-size:12px}
+.proj-chevron{color:var(--gray-300);font-size:13px;transition:transform .2s;flex-shrink:0}
+.proj-card.open .proj-chevron{transform:rotate(90deg)}
+.proj-expanded{display:none;border-top:1px solid var(--gray-100);background:var(--gray-25);padding:20px 18px}
+.proj-card.open .proj-expanded{display:block}
+.exp-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.exp-box{background:var(--white);border:1px solid var(--gray-150);border-radius:var(--radius);padding:14px 16px}
+.exp-box-title{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--gray-400);margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.exp-text{font-size:12.5px;color:var(--gray-600);line-height:1.7;white-space:pre-wrap}
+.exp-text.muted{color:var(--gray-300);font-style:italic}
+.proj-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px dashed var(--gray-200)}
+.mini-select{border:1.5px solid var(--gray-200);border-radius:var(--radius-sm);padding:6px 9px;font-size:12px;color:var(--gray-600);background:var(--white);outline:none}
+
+/* ─── SUPPORT BADGE ─────────────────────────────────────── */
+.support-badge{display:inline-flex;align-items:center;gap:6px;background:var(--teal-50);color:var(--teal-700);padding:5px 11px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--teal-50)}
+
+/* ─── BLOCKER ITEMS ─────────────────────────────────────── */
+.blk-item{display:flex;gap:12px;padding:12px 14px;border-radius:var(--radius);margin-bottom:9px;border:1px solid var(--gray-150);background:var(--white);align-items:flex-start}
+.blk-item.resolved{opacity:.62;background:var(--gray-25)}
+.blk-stripe{width:4px;align-self:stretch;border-radius:4px;flex-shrink:0}
+.blk-stripe.ext{background:var(--amber-500)}.blk-stripe.int{background:var(--red-500)}.blk-stripe.done{background:var(--green-500)}
+.blk-body{flex:1;min-width:0}
+.blk-title{font-size:12.5px;font-weight:600;color:var(--gray-800);margin-bottom:4px}
+.blk-meta{font-size:11px;color:var(--gray-400);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{font-size:10px;padding:2px 8px;border-radius:10px;background:var(--gray-100);color:var(--gray-500);font-weight:600}
+.blk-desc{font-size:11.5px;color:var(--gray-500);margin-top:5px;line-height:1.6}
+
+/* ─── HOLD BANNER ───────────────────────────────────────── */
+.hold-banner{display:flex;align-items:center;gap:8px;background:var(--orange-50);border:1px solid var(--orange-100);color:var(--orange-600);padding:8px 12px;border-radius:var(--radius);font-size:11.5px;font-weight:600;margin-bottom:10px}
+
+/* ─── FORMS ─────────────────────────────────────────────── */
+.fg{margin-bottom:15px}
+.fg label{display:block;font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px;letter-spacing:.3px}
+.fg input,.fg select,.fg textarea{width:100%;border:1.5px solid var(--gray-200);border-radius:var(--radius);padding:9px 12px;font-size:12.5px;color:var(--gray-800);background:var(--white);outline:none;transition:border-color .15s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--blue-500);box-shadow:0 0 0 3px rgba(59,109,255,.1)}
+.fg textarea{resize:vertical;min-height:80px;line-height:1.6}
+.fg-row{display:grid;gap:13px}
+.fg-row-2{grid-template-columns:1fr 1fr}.fg-row-3{grid-template-columns:1fr 1fr 1fr}
+.fg-hint{font-size:10.5px;color:var(--gray-400);margin-top:5px}
+
+/* ─── MODAL ─────────────────────────────────────────────── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(12,18,40,.45);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(2px);padding:16px}
+.modal-bg.open{display:flex}
+.modal{background:var(--white);border-radius:var(--radius-xl);width:560px;max-width:100%;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);position:relative}
+.modal-lg{width:720px}
+.modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--gray-100);flex-shrink:0}
+.modal-title{font-size:16px;font-weight:800;color:var(--gray-900);letter-spacing:-0.3px}
+.modal-sub{font-size:12px;color:var(--gray-400);margin-top:3px}
+.modal-body{padding:20px 24px;overflow-y:auto;flex:1}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--gray-100);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;background:var(--gray-25)}
+.modal-close{position:absolute;top:16px;right:18px;font-size:18px;color:var(--gray-400);cursor:pointer;border:none;background:none;line-height:1}
+.modal-close:hover{color:var(--gray-700)}
+
+/* ─── STANDUP ────────────────────────────────────────────── */
+.su-entry{background:var(--white);border:1px solid var(--gray-150);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:11px;box-shadow:var(--shadow-sm)}
+.su-entry-date{font-size:13px;font-weight:700;color:var(--gray-900);display:flex;align-items:center;gap:8px}
+.su-entry-body{font-size:12.5px;color:var(--gray-600);line-height:1.7;white-space:pre-wrap;margin-top:8px}
+.su-alert{display:flex;align-items:flex-start;gap:9px;padding:9px 13px;border-radius:var(--radius);margin-bottom:7px;font-size:12px}
+.su-alert.danger{background:var(--red-50);color:var(--red-700);border:1px solid var(--red-100)}
+.su-alert.warning{background:var(--amber-50);color:var(--amber-700);border:1px solid var(--amber-100)}
+.su-alert.info{background:var(--blue-50);color:var(--blue-700);border:1px solid var(--blue-100)}
+.su-alert.success{background:var(--green-50);color:var(--green-700);border:1px solid var(--green-100)}
+
+/* ─── DELAY ──────────────────────────────────────────────── */
+.delay-bar-item{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.delay-bar-label{font-size:11.5px;color:var(--gray-600);width:130px;min-width:130px}
+.delay-bar-track{flex:1;height:8px;background:var(--gray-100);border-radius:5px;overflow:hidden}
+.delay-bar-fill{height:100%;border-radius:5px;transition:width .4s}
+.delay-bar-count{font-size:12px;font-weight:700;color:var(--gray-600);width:22px;text-align:right}
+.tl-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--gray-100)}
+.tl-row:last-child{border-bottom:none}
+.tl-name{width:120px;min-width:120px}
+.tl-track{flex:1;position:relative;height:26px}
+.tl-bar-est{position:absolute;top:6px;height:14px;border-radius:4px;background:var(--gray-150);border:1px solid var(--gray-200)}
+.tl-bar-act{position:absolute;top:6px;height:14px;border-radius:4px;opacity:.85}
+.tl-stats{width:120px;min-width:120px;text-align:right}
+.delay-reason-tag{display:inline-flex;padding:4px 11px;border-radius:20px;font-size:11px;font-weight:600;margin-right:5px;margin-bottom:5px;cursor:pointer;border:1.5px solid transparent;transition:all .15s}
+.delay-reason-tag.no-deadline{background:var(--gray-100);color:var(--gray-500)}.delay-reason-tag.no-deadline.sel{background:var(--gray-500);color:#fff}
+.delay-reason-tag.client-delay{background:var(--amber-50);color:var(--amber-600)}.delay-reason-tag.client-delay.sel{background:var(--amber-500);color:#fff}
+.delay-reason-tag.tech-blocker{background:var(--red-50);color:var(--red-600)}.delay-reason-tag.tech-blocker.sel{background:var(--red-500);color:#fff}
+.delay-reason-tag.estimate-wrong{background:var(--purple-50);color:var(--purple-500)}.delay-reason-tag.estimate-wrong.sel{background:var(--purple-500);color:#fff}
+.delay-reason-tag.scope-change{background:var(--blue-50);color:var(--blue-500)}.delay-reason-tag.scope-change.sel{background:var(--blue-500);color:#fff}
+.delay-reason-tag.dependency{background:var(--orange-50);color:var(--orange-500)}.delay-reason-tag.dependency.sel{background:var(--orange-500);color:#fff}
+.delay-reason-tag.resource{background:var(--cyan-50);color:var(--cyan-500)}.delay-reason-tag.resource.sel{background:var(--cyan-500);color:#fff}
+
+/* ─── FILTER BAR ────────────────────────────────────────── */
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.search-input{border:1.5px solid var(--gray-200);border-radius:var(--radius);padding:8px 13px;font-size:12.5px;color:var(--gray-700);background:var(--white);outline:none;min-width:200px;flex:1}
+.search-input:focus{border-color:var(--blue-500)}
+.filter-chip{padding:6px 13px;border-radius:20px;font-size:12px;font-weight:600;color:var(--gray-500);background:var(--white);border:1.5px solid var(--gray-200);cursor:pointer;transition:all .15s}
+.filter-chip:hover{border-color:var(--gray-300)}
+.filter-chip.active{background:var(--blue-500);color:#fff;border-color:var(--blue-500)}
+
+/* ─── MISC ──────────────────────────────────────────────── */
+.empty{text-align:center;padding:36px 20px;color:var(--gray-400)}
+.empty-icon{font-size:30px;opacity:.4;margin-bottom:8px}
+.empty-text{font-size:12.5px}
+.activity-item{display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid var(--gray-100);font-size:12px;color:var(--gray-600)}
+.activity-item:last-child{border-bottom:none}
+.activity-dot{width:6px;height:6px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.list-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--gray-100)}
+.list-row:last-child{border-bottom:none}
+.note-card{background:var(--white);border:1px solid var(--gray-150);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow-sm)}
+.toast-wrap{position:fixed;bottom:22px;right:22px;z-index:200;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--gray-900);color:#fff;padding:11px 18px;border-radius:var(--radius);font-size:12.5px;font-weight:500;box-shadow:var(--shadow-lg);opacity:0;transform:translateY(10px);transition:all .3s}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.success{background:var(--green-600)}.toast.danger{background:var(--red-600)}.toast.warn{background:var(--amber-600)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-2-side{display:grid;grid-template-columns:1fr 340px;gap:16px;margin-bottom:16px}
+
+/* ─── RESPONSIVE ────────────────────────────────────────── */
+@media(max-width:900px){
+  .grid-2,.grid-2-side,.exp-grid,.metric-grid-4,.metric-grid-3{grid-template-columns:1fr!important}
+  .topbar{display:flex}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);transition:transform .25s;box-shadow:var(--shadow-lg)}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar.open ~ .scrim{display:block}
+  .page{padding:18px 16px}
+  .metric-grid-4,.metric-grid-3{display:grid;grid-template-columns:1fr 1fr!important}
+  .proj-meta-col{display:none}
+  .proj-meta-col.keep{display:block;min-width:auto}
+  .fg-row-2,.fg-row-3{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+  .metric-grid-4,.metric-grid-3{grid-template-columns:1fr 1fr!important}
+  .page-title{font-size:18px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── SIDEBAR ──────────────────────────────────────────── -->
+<div class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">
+      <div class="sb-logo-mark">IC</div>
+      <div><div class="sb-logo-text">Command Center</div><div class="sb-logo-sub">Delivery &amp; Delay Tracker</div></div>
+    </div>
+  </div>
+
+  <div class="sb-nav">
+    <div class="sb-section">Delivery</div>
+    <div class="sb-item active" onclick="nav('dashboard',this)" id="nav-dashboard"><span class="sb-icon">▦</span>Dashboard</div>
+    <div class="sb-item" onclick="nav('projects',this)" id="nav-projects"><span class="sb-icon">▢</span>Projects <span class="sb-badge neutral" id="sb-proj-c">0</span></div>
+    <div class="sb-item" onclick="nav('standup',this)" id="nav-standup"><span class="sb-icon">☀</span>Daily Standup</div>
+    <div class="sb-item" onclick="nav('blockers',this)" id="nav-blockers"><span class="sb-icon">△</span>Blockers <span class="sb-badge" id="sb-blk-c">0</span></div>
+    <div class="sb-item" onclick="nav('scope',this)" id="nav-scope"><span class="sb-icon">◈</span>Scope &amp; Bugs <span class="sb-badge warn" id="sb-scope-c">0</span></div>
+    <div class="sb-item" onclick="nav('delays',this)" id="nav-delays"><span class="sb-icon">⏱</span>Delay Analysis</div>
+
+    <div class="sb-section">Knowledge</div>
+    <div class="sb-item" onclick="nav('moms',this)" id="nav-moms"><span class="sb-icon">▤</span>Meeting MoM</div>
+    <div class="sb-item" onclick="nav('notes',this)" id="nav-notes"><span class="sb-icon">✎</span>Raw Notes</div>
+
+    <div class="sb-section">Planning</div>
+    <div class="sb-item" onclick="nav('reminders',this)" id="nav-reminders"><span class="sb-icon">◉</span>Reminders <span class="sb-badge warn" id="sb-rem-c">0</span></div>
+    <div class="sb-item" onclick="nav('team',this)" id="nav-team"><span class="sb-icon">◎</span>Team</div>
+  </div>
+
+  <div class="sb-footer">
+    <div class="sb-divider"></div>
+    <div class="store-badge" id="store-badge">💾 Local only</div>
+    <div class="sb-item" onclick="nav('workspace',this)" id="nav-workspace"><span class="sb-icon">🗂</span>My Workspace</div>
+    <div class="sb-item" onclick="exportBackup()"><span class="sb-icon">⤓</span>Backup / Export</div>
+    <div class="sb-today"><strong id="sb-date"></strong>Your implementation OS</div>
+  </div>
+</div>
+<div class="scrim" onclick="closeSidebar()"></div>
+
+<!-- ── MAIN ─────────────────────────────────────────────── -->
+<div class="main">
+<div class="topbar">
+  <button class="hamburger" onclick="openSidebar()">☰</button>
+  <div class="topbar-title">Command Center</div>
+</div>
+
+<!-- ══ DASHBOARD ══════════════════════════════════════════ -->
+<div class="page active" id="page-dashboard">
+  <div class="page-header">
+    <div><div class="page-title">Dashboard</div><div class="page-sub" id="dash-greeting">Your delivery overview for today</div></div>
+    <div class="page-actions">
+      <button class="btn btn-secondary btn-sm" onclick="nav('standup')">☀ Standup</button>
+      <button class="btn btn-primary btn-sm" onclick="openProjModal()">+ New Project</button>
+    </div>
+  </div>
+  <div class="metric-grid metric-grid-4" id="dash-metrics-1"></div>
+  <div class="metric-grid metric-grid-4" id="dash-metrics-2"></div>
+
+  <div class="grid-2-side">
+    <div class="card card-pad">
+      <div class="section-hd"><div class="section-title">Project Health <span class="section-count" id="dash-health-count"></span></div>
+        <button class="btn btn-secondary btn-xs" onclick="nav('projects')">View all →</button></div>
+      <div class="table-wrap" id="dash-health-table"></div>
+    </div>
+    <div class="card card-pad">
+      <div class="section-hd"><div class="section-title">Why Projects Delay</div></div>
+      <div id="dash-delay-reasons"></div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--gray-100)">
+        <div style="font-size:10.5px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Top action today</div>
+        <div id="dash-top-action" style="font-size:12.5px;color:var(--gray-600);line-height:1.7"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:16px">
+    <div class="card card-pad">
+      <div class="section-hd"><div class="section-title">Needs Your Attention</div></div>
+      <div id="dash-attention"></div>
+    </div>
+    <div class="card card-pad">
+      <div class="section-hd"><div class="section-title">Upcoming Deadlines (14 days)</div></div>
+      <div id="dash-upcoming"></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card card-pad">
+      <div class="section-hd"><div class="section-title">Today's Reminders</div><button class="btn btn-secondary btn-xs" onclick="nav('reminders')">All →</button></div>
+      <div id="dash-reminders"></div>
+    </div>
+    <div class="card card-pad">
+      <div class="section-hd"><div class="section-title">Recent Activity</div></div>
+      <div id="dash-activity"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PROJECTS ════════════════════════════════════════════ -->
+<div class="page" id="page-projects">
+  <div class="page-header">
+    <div><div class="page-title">Projects</div><div class="page-sub">All projects — expand a project to see scope, blockers &amp; support. Nothing is hidden.</div></div>
+    <div class="page-actions">
+      <button class="btn btn-secondary btn-sm" onclick="openScopeModal()">⊕ Log Issue</button>
+      <button class="btn btn-primary btn-sm" onclick="openProjModal()">+ New Project</button>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <input class="search-input" placeholder="Search projects..." id="proj-search" oninput="renderProjects()">
+    <div class="filter-chip active" data-f="all" onclick="setStatusFilter('all',this)">All</div>
+    <div class="filter-chip" data-f="active" onclick="setStatusFilter('active',this)">Active</div>
+    <div class="filter-chip" data-f="stuck" onclick="setStatusFilter('stuck',this)">Stuck</div>
+    <div class="filter-chip" data-f="waiting" onclick="setStatusFilter('waiting',this)">Waiting</div>
+    <div class="filter-chip" data-f="onhold" onclick="setStatusFilter('onhold',this)">On Hold</div>
+    <div class="filter-chip" data-f="postlive" onclick="setStatusFilter('postlive',this)">Post-Live</div>
+    <div class="filter-chip" data-f="completed" onclick="setStatusFilter('completed',this)">Completed</div>
+  </div>
+  <div id="proj-list"></div>
+</div>
+
+<!-- ══ STANDUP ═════════════════════════════════════════════ -->
+<div class="page" id="page-standup">
+  <div class="page-header">
+    <div><div class="page-title">Daily Standup</div><div class="page-sub" id="su-date-sub"></div></div>
+    <div class="page-actions"><button class="btn btn-primary btn-sm" onclick="openStandupModal()">+ Add Today's Standup</button></div>
+  </div>
+  <div class="card card-pad" style="margin-bottom:16px;border-left:4px solid var(--blue-500)">
+    <div style="font-size:10.5px;font-weight:700;color:var(--blue-500);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Live signals to cover today</div>
+    <div id="su-alerts"></div>
+  </div>
+  <div class="section-hd"><div class="section-title">Standup Log <span class="section-count" id="su-log-count"></span></div></div>
+  <div id="su-log"></div>
+</div>
+
+<!-- ══ BLOCKERS ════════════════════════════════════════════ -->
+<div class="page" id="page-blockers">
+  <div class="page-header">
+    <div><div class="page-title">Blockers</div><div class="page-sub">Active and resolved blockers across all projects — resolve within SLA.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="openBlockerModal()">+ Log Blocker</button>
+  </div>
+  <div class="metric-grid metric-grid-3" id="blk-metrics"></div>
+  <div class="filter-bar">
+    <div class="filter-chip active" data-bf="open" onclick="setBlkFilter('open',this)">Active</div>
+    <div class="filter-chip" data-bf="resolved" onclick="setBlkFilter('resolved',this)">Resolved</div>
+    <div class="filter-chip" data-bf="all" onclick="setBlkFilter('all',this)">All</div>
+  </div>
+  <div id="blk-list"></div>
+</div>
+
+<!-- ══ SCOPE & BUGS ════════════════════════════════════════ -->
+<div class="page" id="page-scope">
+  <div class="page-header">
+    <div><div class="page-title">Scope &amp; Bugs</div><div class="page-sub">Post-live bugs, scope additions, missed items — open and completed, all tracked.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="openScopeModal()">+ Log Issue</button>
+  </div>
+  <div class="metric-grid metric-grid-4" id="scope-metrics"></div>
+  <div class="filter-bar">
+    <div class="filter-chip active" data-sf="open" onclick="setScopeFilter('open',this)">Open</div>
+    <div class="filter-chip" data-sf="resolved" onclick="setScopeFilter('resolved',this)">Completed</div>
+    <div class="filter-chip" data-sf="all" onclick="setScopeFilter('all',this)">All</div>
+  </div>
+  <div id="scope-list"></div>
+</div>
+
+<!-- ══ DELAY ANALYSIS ══════════════════════════════════════ -->
+<div class="page" id="page-delays">
+  <div class="page-header"><div><div class="page-title">Delay Analysis</div><div class="page-sub">Find the root causes of delivery delays — fix them, plan better, deliver on time.</div></div></div>
+  <div class="metric-grid metric-grid-4" id="delay-metrics"></div>
+  <div class="grid-2" style="margin-bottom:16px">
+    <div class="card card-pad"><div class="section-title" style="margin-bottom:16px">Duration: Estimated vs Actual</div><div id="delay-timeline"></div></div>
+    <div class="card card-pad"><div class="section-title" style="margin-bottom:16px">Delay Root Causes</div><div id="delay-causes"></div></div>
+  </div>
+  <div class="card card-pad"><div class="section-title" style="margin-bottom:16px">Project Delay Details</div><div class="table-wrap" id="delay-detail-table"></div></div>
+</div>
+
+<!-- ══ MEETING MoM ═════════════════════════════════════════ -->
+<div class="page" id="page-moms">
+  <div class="page-header">
+    <div><div class="page-title">Meeting Minutes (MoM)</div><div class="page-sub">Record what was discussed, decided, and who owns the next action.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="openMomModal()">+ New MoM</button>
+  </div>
+  <div id="mom-list"></div>
+</div>
+
+<!-- ══ RAW NOTES ═══════════════════════════════════════════ -->
+<div class="page" id="page-notes">
+  <div class="page-header">
+    <div><div class="page-title">Raw Notes</div><div class="page-sub">Quick scratch notes &amp; brain-dumps. Export any note as a .txt file.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="openNoteModal()">+ New Note</button>
+  </div>
+  <div id="notes-list"></div>
+</div>
+
+<!-- ══ REMINDERS ═══════════════════════════════════════════ -->
+<div class="page" id="page-reminders">
+  <div class="page-header">
+    <div><div class="page-title">Reminders</div><div class="page-sub">Client follow-ups, escalations, focus reminders &amp; personal/internal tasks.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="openRemModal()">+ Add Reminder</button>
+  </div>
+  <div class="card" style="overflow:hidden"><div id="rem-list"></div></div>
+</div>
+
+<!-- ══ TEAM ════════════════════════════════════════════════ -->
+<div class="page" id="page-team">
+  <div class="page-header">
+    <div><div class="page-title">Team</div><div class="page-sub">Manage members and view workload distribution.</div></div>
+    <button class="btn btn-primary btn-sm" onclick="openTeamModal()">+ Add Member</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:13px;margin-bottom:20px" id="team-grid"></div>
+  <div class="card card-pad"><div class="section-title" style="margin-bottom:16px">Workload by Member</div><div class="table-wrap" id="team-workload"></div></div>
+</div>
+
+<!-- ══ MY WORKSPACE (footer module) ════════════════════════ -->
+<div class="page" id="page-workspace">
+  <div class="page-header"><div><div class="page-title">My Workspace</div><div class="page-sub">Internal: leave records &amp; Google Drive folder links.</div></div></div>
+  <div class="grid-2">
+    <div class="card card-pad">
+      <div class="section-hd"><div class="section-title">My Leave Records</div><button class="btn btn-primary btn-xs" onclick="openLeaveModal()">+ Add Leave</button></div>
+      <div class="table-wrap" id="leave-list"></div>
+    </div>
+    <div class="card card-pad">
+      <div class="section-hd"><div class="section-title">Google Drive Folder Links</div><button class="btn btn-primary btn-xs" onclick="openDriveModal()">+ Add Link</button></div>
+      <div id="drive-list"></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ══════════════════ MODALS ══════════════════ -->
+
+<!-- PROJECT MODAL -->
+<div class="modal-bg" id="proj-modal"><div class="modal modal-lg">
+  <div class="modal-header"><div class="modal-title" id="proj-modal-title">New Project</div>
+    <div class="modal-sub">Scope is private to this card — visible only when you open the project.</div>
+    <button class="modal-close" onclick="closeModal('proj-modal')">✕</button></div>
+  <div class="modal-body">
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>Project Name *</label><input id="p-name" placeholder="e.g. Image Star – Zoho Inventory"></div>
+      <div class="fg"><label>Phase / Module</label><input id="p-phase" placeholder="e.g. Packing slip automation"></div>
+    </div>
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>Status *</label><select id="p-status">
+        <option value="idle">⚪ Idle — Not started</option>
+        <option value="active">🟢 Active — In progress</option>
+        <option value="waiting">🟡 Waiting — Client response</option>
+        <option value="stuck">🔴 Stuck — Technical blocker</option>
+        <option value="onhold">🟠 On Hold — Client request / no response</option>
+        <option value="stabilizing">🟣 Stabilizing — Post-live fixes</option>
+        <option value="postlive">🩵 Post-Live / Support</option>
+        <option value="completed">🔵 Completed</option>
+      </select></div>
+      <div class="fg"><label>Assigned To</label><select id="p-assigned" multiple style="height:80px"></select></div>
+    </div>
+    <div class="fg-row fg-row-3">
+      <div class="fg"><label>Start Date</label><input type="date" id="p-start"></div>
+      <div class="fg"><label>Expected End</label><input type="date" id="p-exp-end"></div>
+      <div class="fg"><label>Actual End</label><input type="date" id="p-act-end"></div>
+    </div>
+
+    <div style="background:var(--teal-50);border:1px solid var(--cyan-100);border-radius:var(--radius);padding:14px 16px;margin-bottom:15px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--teal-700);margin:0">
+          <input type="checkbox" id="p-support-active" style="width:auto" onchange="toggleSupportFields()"> Support period active
+        </label>
+        <span class="fg-hint" style="margin:0">Can be started at any stage (e.g. post-live).</span>
+      </div>
+      <div class="fg-row fg-row-3" id="support-fields" style="display:none">
+        <div class="fg" style="margin:0"><label>Support Start</label><input type="date" id="p-support-start"></div>
+        <div class="fg" style="margin:0"><label>Support End</label><input type="date" id="p-support-end"></div>
+        <div class="fg" style="margin:0"><label>Quick-set length</label>
+          <select id="p-support-len" onchange="quickSupport()">
+            <option value="">— choose —</option><option value="14">2 weeks</option><option value="30">1 month</option>
+            <option value="60">2 months</option><option value="90">3 months</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="fg"><label>📋 Planned Scope (original agreement)</label><textarea id="p-scope-planned" placeholder="The scope as planned / agreed at kickoff — deliverables, modules, requirements..." style="min-height:90px"></textarea></div>
+    <div class="fg"><label>➕ Added Scope &amp; Extra Work Done</label><textarea id="p-scope-added" placeholder="Points added later, client change-requests, and additional things actually delivered beyond the plan..." style="min-height:90px"></textarea></div>
+
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>📎 Scope Document Link (Drive / URL)</label><input id="p-scope-link" placeholder="https://drive.google.com/..."></div>
+      <div class="fg"><label>⬆ Upload Scope PDF (optional)</label><input type="file" id="p-scope-file" accept="application/pdf" onchange="handleScopeFile(this)">
+        <div class="fg-hint" id="p-scope-file-hint">Stored inside this tool. Keep under ~2&nbsp;MB — for large files use the Drive link instead.</div></div>
+    </div>
+
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>Dependencies</label><input id="p-deps" placeholder="e.g. WhatsApp API approval, client credentials"></div>
+      <div class="fg"><label>On-Hold Reason (if applicable)</label><select id="p-hold-reason">
+        <option value="">— Not on hold —</option>
+        <option value="client-no-response">Client not responding</option>
+        <option value="client-requested">Client requested hold</option>
+        <option value="waiting-approval">Waiting for approval</option>
+        <option value="waiting-credentials">Waiting for credentials / access</option>
+        <option value="waiting-3rd-party">Waiting for 3rd party (Meta, WhatsApp...)</option>
+        <option value="internal-resource">Internal resource unavailable</option>
+        <option value="budget-hold">Budget / commercial hold</option>
+      </select></div>
+    </div>
+    <div class="fg"><label>Delay Reason(s)</label>
+      <div id="delay-reason-picker" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+        <span class="delay-reason-tag no-deadline" data-r="no-deadline" onclick="toggleDelayTag(this)">No clear deadline</span>
+        <span class="delay-reason-tag client-delay" data-r="client-delay" onclick="toggleDelayTag(this)">Client delays</span>
+        <span class="delay-reason-tag tech-blocker" data-r="tech-blocker" onclick="toggleDelayTag(this)">Technical blocker</span>
+        <span class="delay-reason-tag estimate-wrong" data-r="estimate-wrong" onclick="toggleDelayTag(this)">Wrong estimate</span>
+        <span class="delay-reason-tag scope-change" data-r="scope-change" onclick="toggleDelayTag(this)">Scope change</span>
+        <span class="delay-reason-tag dependency" data-r="dependency" onclick="toggleDelayTag(this)">Dependency</span>
+        <span class="delay-reason-tag resource" data-r="resource" onclick="toggleDelayTag(this)">Resource issue</span>
+      </div>
+    </div>
+    <div class="fg"><label>Internal Notes (login details, context, reminders to self)</label><textarea id="p-notes" placeholder="Private notes — credentials hints, context, anything you need when you reopen this project..."></textarea></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('proj-modal')">Cancel</button><button class="btn btn-primary" onclick="saveProject()">Save Project</button></div>
+</div></div>
+
+<!-- BLOCKER MODAL -->
+<div class="modal-bg" id="blk-modal"><div class="modal">
+  <div class="modal-header"><div class="modal-title">Log Blocker</div><button class="modal-close" onclick="closeModal('blk-modal')">✕</button></div>
+  <div class="modal-body">
+    <div class="fg"><label>Project *</label><select id="b-proj"></select></div>
+    <div class="fg"><label>Blocker Title *</label><input id="b-title" placeholder="e.g. Client portal credentials not shared"></div>
+    <div class="fg-row fg-row-3">
+      <div class="fg"><label>Type</label><select id="b-type">
+        <option value="external">External (client/3rd-party)</option><option value="internal">Internal</option>
+        <option value="credentials">Credentials / access</option><option value="meta-policy">Platform policy</option>
+      </select></div>
+      <div class="fg"><label>Blocked Since</label><input type="date" id="b-since"></div>
+      <div class="fg"><label>Escalate After</label><select id="b-sla">
+        <option value="1">1 day</option><option value="2">2 days</option><option value="3" selected>3 days</option>
+        <option value="5">5 days</option><option value="7">7 days</option></select></div>
+    </div>
+    <div class="fg"><label>Description &amp; Next Action</label><textarea id="b-desc" placeholder="What is blocked? What is the next action?"></textarea></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('blk-modal')">Cancel</button><button class="btn btn-primary" onclick="saveBlocker()">Log Blocker</button></div>
+</div></div>
+
+<!-- SCOPE MODAL -->
+<div class="modal-bg" id="scope-modal"><div class="modal">
+  <div class="modal-header"><div class="modal-title">Log Scope Issue / Bug</div><div class="modal-sub">Track post-live bugs, scope additions &amp; missed items.</div><button class="modal-close" onclick="closeModal('scope-modal')">✕</button></div>
+  <div class="modal-body">
+    <div class="fg"><label>Project *</label><select id="sc-proj"></select></div>
+    <div class="fg"><label>Issue Title *</label><input id="sc-title" placeholder="e.g. Post-live: tickets not routing to correct group"></div>
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>Type *</label><select id="sc-type">
+        <option value="bug">🐛 Post-live bug</option><option value="scope-add">📌 Scope addition</option>
+        <option value="missed">⚠ Missed in planning</option><option value="regression">↩ Regression</option>
+        <option value="performance">⚡ Performance</option><option value="training">📚 Training / adoption</option></select></div>
+      <div class="fg"><label>Severity</label><select id="sc-sev">
+        <option value="critical">🔴 Critical</option><option value="high">🟠 High</option>
+        <option value="medium" selected>🟡 Medium</option><option value="low">⚪ Low</option></select></div>
+    </div>
+    <div class="fg"><label>Impact &amp; Notes</label><textarea id="sc-notes" placeholder="Impact, who is affected, resolution plan..."></textarea></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('scope-modal')">Cancel</button><button class="btn btn-primary" onclick="saveScopeIssue()">Log Issue</button></div>
+</div></div>
+
+<!-- STANDUP MODAL -->
+<div class="modal-bg" id="standup-modal"><div class="modal modal-lg">
+  <div class="modal-header"><div class="modal-title" id="standup-modal-title">Add Standup</div><div class="modal-sub">Write your standup notes after the call — one entry per day.</div><button class="modal-close" onclick="closeModal('standup-modal')">✕</button></div>
+  <div class="modal-body">
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>Date *</label><input type="date" id="su-date"></div>
+      <div class="fg"><label>My one focus today</label><input id="su-focus" placeholder="e.g. Finish Image Star packing-slip Deluge"></div>
+    </div>
+    <div class="fg"><label>Standup Notes (what's done / in progress / blocked)</label><textarea id="su-notes" placeholder="• Yesterday: ...\n• Today: ...\n• Blockers: ..." style="min-height:160px"></textarea></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('standup-modal')">Cancel</button><button class="btn btn-primary" onclick="saveStandup()">Save Standup</button></div>
+</div></div>
+
+<!-- MoM MODAL -->
+<div class="modal-bg" id="mom-modal"><div class="modal modal-lg">
+  <div class="modal-header"><div class="modal-title" id="mom-modal-title">New Meeting MoM</div><button class="modal-close" onclick="closeModal('mom-modal')">✕</button></div>
+  <div class="modal-body">
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>Meeting Title *</label><input id="mom-title" placeholder="e.g. Image Star — Inventory review"></div>
+      <div class="fg"><label>Date</label><input type="date" id="mom-date"></div>
+    </div>
+    <div class="fg"><label>Attendees</label><input id="mom-attendees" placeholder="e.g. Arul, Caitlin, Rachel"></div>
+    <div class="fg"><label>Agenda / Discussion</label><textarea id="mom-agenda" placeholder="What was discussed..." style="min-height:90px"></textarea></div>
+    <div class="fg"><label>Decisions</label><textarea id="mom-decisions" placeholder="What was decided..."></textarea></div>
+    <div class="fg"><label>Action Items (owner — task — due)</label><textarea id="mom-actions" placeholder="Arul — configure freight minimums — 5 Jun"></textarea></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('mom-modal')">Cancel</button><button class="btn btn-primary" onclick="saveMom()">Save MoM</button></div>
+</div></div>
+
+<!-- RAW NOTE MODAL -->
+<div class="modal-bg" id="note-modal"><div class="modal modal-lg">
+  <div class="modal-header"><div class="modal-title" id="note-modal-title">New Note</div><button class="modal-close" onclick="closeModal('note-modal')">✕</button></div>
+  <div class="modal-body">
+    <div class="fg"><label>Title</label><input id="note-title" placeholder="e.g. Deluge snippet — freight calc"></div>
+    <div class="fg"><label>Note</label><textarea id="note-body" placeholder="Type anything..." style="min-height:200px"></textarea></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('note-modal')">Cancel</button><button class="btn btn-primary" onclick="saveNote()">Save Note</button></div>
+</div></div>
+
+<!-- REMINDER MODAL -->
+<div class="modal-bg" id="rem-modal"><div class="modal">
+  <div class="modal-header"><div class="modal-title">Add Reminder</div><button class="modal-close" onclick="closeModal('rem-modal')">✕</button></div>
+  <div class="modal-body">
+    <div class="fg"><label>Reminder *</label><input id="r-text" placeholder="e.g. Follow up on WhatsApp credentials"></div>
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>Date *</label><input type="date" id="r-date"></div>
+      <div class="fg"><label>Time</label><input type="time" id="r-time" value="09:30"></div>
+    </div>
+    <div class="fg"><label>Category *</label><select id="r-cat">
+      <option value="followup">📞 Follow up with client</option><option value="stuck">🔴 Check stuck task</option>
+      <option value="escalate">⬆ Escalate to management</option><option value="standup">☀ Standup prep</option>
+      <option value="focus">🎯 Focus reminder</option><option value="review">📋 Project review</option>
+      <option value="delivery">🚀 Delivery checkpoint</option><option value="personal">🏠 Personal / Internal</option></select></div>
+    <div class="fg"><label>Linked Project (optional)</label><select id="r-proj"><option value="">— None —</option></select></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('rem-modal')">Cancel</button><button class="btn btn-primary" onclick="saveReminder()">Add Reminder</button></div>
+</div></div>
+
+<!-- TEAM MODAL -->
+<div class="modal-bg" id="team-modal"><div class="modal" style="width:420px">
+  <div class="modal-header"><div class="modal-title" id="team-modal-title">Add Team Member</div><button class="modal-close" onclick="closeModal('team-modal')">✕</button></div>
+  <div class="modal-body">
+    <div class="fg"><label>Full Name *</label><input id="tm-name" placeholder="e.g. Arjun Kumar"></div>
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>Short Code (2–3)</label><input id="tm-code" maxlength="3" placeholder="AR" style="text-transform:uppercase"></div>
+      <div class="fg"><label>Role</label><select id="tm-role">
+        <option>Implementation Engineer</option><option>Solution Architect</option><option>Tech Lead</option>
+        <option>Junior Engineer</option><option>Support Engineer</option><option>Consultant</option></select></div>
+    </div>
+    <div class="fg"><label>Avatar Color</label><div style="display:flex;gap:8px;margin-top:4px" id="color-picker">
+      <div onclick="selectColor(this,'#dbeafe','#1d4ed8')" style="width:28px;height:28px;border-radius:50%;background:#dbeafe;border:2px solid #1d4ed8;cursor:pointer"></div>
+      <div onclick="selectColor(this,'#d1fae5','#065f46')" style="width:28px;height:28px;border-radius:50%;background:#d1fae5;border:2px solid transparent;cursor:pointer"></div>
+      <div onclick="selectColor(this,'#ede9fe','#6d28d9')" style="width:28px;height:28px;border-radius:50%;background:#ede9fe;border:2px solid transparent;cursor:pointer"></div>
+      <div onclick="selectColor(this,'#fef3c7','#92400e')" style="width:28px;height:28px;border-radius:50%;background:#fef3c7;border:2px solid transparent;cursor:pointer"></div>
+      <div onclick="selectColor(this,'#fee2e2','#991b1b')" style="width:28px;height:28px;border-radius:50%;background:#fee2e2;border:2px solid transparent;cursor:pointer"></div>
+      <div onclick="selectColor(this,'#cffafe','#0e7490')" style="width:28px;height:28px;border-radius:50%;background:#cffafe;border:2px solid transparent;cursor:pointer"></div>
+    </div></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('team-modal')">Cancel</button><button class="btn btn-primary" onclick="saveMember()">Save Member</button></div>
+</div></div>
+
+<!-- LEAVE MODAL -->
+<div class="modal-bg" id="leave-modal"><div class="modal">
+  <div class="modal-header"><div class="modal-title">Add Leave Record</div><button class="modal-close" onclick="closeModal('leave-modal')">✕</button></div>
+  <div class="modal-body">
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>From *</label><input type="date" id="lv-from"></div>
+      <div class="fg"><label>To</label><input type="date" id="lv-to"></div>
+    </div>
+    <div class="fg-row fg-row-2">
+      <div class="fg"><label>Type</label><select id="lv-type"><option>Casual</option><option>Sick</option><option>Earned</option><option>Comp-off</option><option>Holiday</option><option>WFH</option></select></div>
+      <div class="fg"><label>Days</label><input type="number" id="lv-days" min="0.5" step="0.5" value="1"></div>
+    </div>
+    <div class="fg"><label>Reason / Note</label><input id="lv-reason" placeholder="Optional"></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('leave-modal')">Cancel</button><button class="btn btn-primary" onclick="saveLeave()">Save</button></div>
+</div></div>
+
+<!-- DRIVE LINK MODAL -->
+<div class="modal-bg" id="drive-modal"><div class="modal">
+  <div class="modal-header"><div class="modal-title">Add Google Drive Link</div><button class="modal-close" onclick="closeModal('drive-modal')">✕</button></div>
+  <div class="modal-body">
+    <div class="fg"><label>Label *</label><input id="dl-label" placeholder="e.g. Image Star — Project files"></div>
+    <div class="fg"><label>Folder URL *</label><input id="dl-url" placeholder="https://drive.google.com/drive/folders/..."></div>
+    <div class="fg"><label>Category</label><input id="dl-cat" placeholder="e.g. Client, Internal, Templates"></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('drive-modal')">Cancel</button><button class="btn btn-primary" onclick="saveDrive()">Save Link</button></div>
+</div></div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+/* ═══════════════ PERSISTENCE — Supabase cloud DB + local fallback ═══════════════ */
+/*  ┌──────────────────────────────────────────────────────────────────────┐
+    │  TO TURN ON THE CLOUD DATABASE (free, ~2 min):                         │
+    │   1. Create a project at supabase.com                                  │
+    │   2. SQL Editor → run the SQL given in the hosting guide               │
+    │      (creates one table: command_center)                              │
+    │   3. Settings → API → copy "Project URL" and the "anon public" key     │
+    │   4. Paste them below.                                                 │
+    │  Leave both blank to keep running LOCAL-ONLY (this browser only).      │
+    └──────────────────────────────────────────────────────────────────────┘ */
+var SUPABASE_URL  = '';        // e.g. 'https://abcdefgh.supabase.co'
+var SUPABASE_ANON = '';        // e.g. 'eyJhbGciOiJIUzI1NiIsInR5cCI6...'
+var CC_TABLE      = 'command_center';
+var CC_ROW        = 'main';
+
+var DB_KEY='icc_db_v2';
+var DB;
+var sb=null, cloud=false, saveTimer=null;
+function today(){return new Date().toISOString().split('T')[0]}
+function uid(){return 'id'+Date.now()+Math.floor(Math.random()*9999)}
+
+function seed(){
+  return {
+    team:[
+      {id:'m1',name:'Arjun',code:'AR',role:'Implementation Engineer',bg:'#dbeafe',text:'#1d4ed8'},
+      {id:'m2',name:'Priya',code:'PR',role:'Implementation Engineer',bg:'#d1fae5',text:'#065f46'},
+      {id:'m3',name:'Dev',code:'DV',role:'Implementation Engineer',bg:'#ede9fe',text:'#6d28d9'}
+    ],
+    projects:[
+      {id:'p1',name:'Image Star — Zoho Inventory',phase:'Packing slip automation',status:'active',assigned:['m1','m2'],
+       startDate:'2026-05-18',expEndDate:'2026-05-30',actEndDate:'',supportActive:false,supportStart:'',supportEnd:'',
+       delayReasons:['client-delay'],holdReason:'',
+       scopePlanned:'Native custom reports, MRP sticker printing in Zoho Creator, Package module packing-slip automation, invoice automation with transport-based freight minimums.',
+       scopeAdded:'Added: create invoices directly from packages. Extra: confirmed custom field IDs mapped for packing slip.',
+       scopeLink:'',scopeFileName:'',scopeFileData:'',deps:'Confirmed custom field IDs',notes:'Freight minimum logic pending sign-off.',
+       blockers:[{id:'b1',title:'Freight minimum values awaited from client',type:'external',since:'2026-05-26',sla:3,desc:'Need per-transporter minimum to finish invoice automation.',resolved:false}],
+       hours:[{id:'h1',date:'2026-05-26',hours:4,member:'m1',desc:'Custom report build'}],},
+      {id:'p2',name:'Virtual Coworker — Zoho CRM',phase:'Region sync + workflows',status:'stabilizing',assigned:['m3'],
+       startDate:'2026-05-10',expEndDate:'2026-05-24',actEndDate:'2026-05-25',supportActive:true,supportStart:'2026-05-25',supportEnd:'2026-06-25',
+       delayReasons:['tech-blocker'],holdReason:'',
+       scopePlanned:'Region field sync from Sales Enquiries to Job Orders; email notification workflows on Job Order creation.',
+       scopeAdded:'Added: Blueprint enforcement on Lead Status. Fixed via form Related-List mapping + enable workflow trigger in form integration.',
+       scopeLink:'',scopeFileName:'',scopeFileData:'',deps:'',notes:'Main contact: Caitlin. AU owner: Rachel.',
+       blockers:[],hours:[{id:'h2',date:'2026-05-20',hours:5,member:'m3',desc:'Workflow trigger fix'}],}
+    ],
+    scopeIssues:[
+      {id:'s1',projectId:'p1',title:'Client requested bulk MRP sticker batch print',type:'scope-add',severity:'medium',date:'2026-05-25',notes:'Needs written approval + timeline.',resolved:false},
+      {id:'s2',projectId:'p2',title:'Post-live: region not syncing on prefill path',type:'bug',severity:'high',date:'2026-05-22',notes:'Root cause: form path, not Deluge.',resolved:true,resolvedDate:'2026-05-25'}
+    ],
+    reminders:[
+      {id:'r1',text:'Chase Image Star — freight minimum values',cat:'followup',date:today(),time:'10:00',projId:'p1',done:false},
+      {id:'r2',text:'Standup prep — review statuses before 10am',cat:'standup',date:today(),time:'09:30',projId:'',done:false}
+    ],
+    standups:[],
+    moms:[],
+    notes:[],
+    leaves:[],
+    driveLinks:[],
+    activityLog:[]
+  };
+}
+function localSave(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB))}catch(e){}}
+function localLoad(){try{var raw=localStorage.getItem(DB_KEY);if(raw)return JSON.parse(raw)}catch(e){}return null}
+
+function setStore(isCloud){var el=document.getElementById('store-badge');if(!el)return;el.textContent=isCloud?'☁ Cloud DB · synced':'💾 Local only';el.className='store-badge'+(isCloud?' cloud':'')}
+function setSync(s){var el=document.getElementById('store-badge');if(!el||!cloud)return;el.className='store-badge cloud';el.textContent=s==='saving'?'☁ Saving…':s==='err'?'⚠ Sync error — saved locally':'☁ Cloud DB · synced'}
+
+function loadDB(cb){
+  if(SUPABASE_URL && SUPABASE_ANON && window.supabase){
+    try{
+      sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+      sb.from(CC_TABLE).select('data').eq('id',CC_ROW).maybeSingle().then(function(res){
+        if(res.error){console.warn('Cloud load failed:',res.error.message);return fallback()}
+        cloud=true;setStore(true);
+        if(res.data&&res.data.data){DB=res.data.data;localSave()}
+        else{DB=localLoad()||seed();pushCloud()}   /* first run: seed cloud from local */
+        if(cb)cb();
+      },function(err){console.warn('Cloud unreachable:',err);fallback()});
+      return;
+    }catch(e){console.warn(e);return fallback()}
+  }
+  fallback();
+  function fallback(){cloud=false;setStore(false);DB=localLoad()||seed();localSave();if(cb)cb()}
+}
+
+function pushCloud(){
+  if(!cloud||!sb)return;
+  sb.from(CC_TABLE).upsert({id:CC_ROW,data:DB,updated_at:new Date().toISOString()}).then(function(res){
+    setSync(res.error?'err':'ok');if(res.error)console.warn('Cloud save failed:',res.error.message);
+  });
+}
+
+function saveDB(){
+  localSave();
+  if(cloud){setSync('saving');clearTimeout(saveTimer);saveTimer=setTimeout(pushCloud,600)}
+}
+
+/* convenience refs */
+function P(){return DB.projects} function T(){return DB.team}
+
+/* ═══════════════ HELPERS ═══════════════ */
+function fd(s){if(!s)return'—';var d=new Date(s+'T00:00:00');return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'})}
+function daysUntil(s){if(!s)return null;return Math.ceil((new Date(s+'T00:00:00')-new Date(today()+'T00:00:00'))/86400000)}
+function daysSince(s){if(!s)return 0;return Math.floor((new Date(today()+'T00:00:00')-new Date(s+'T00:00:00'))/86400000)}
+function addDays(s,n){var d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().split('T')[0]}
+function estDays(p){if(!p.startDate||!p.expEndDate)return 0;return Math.max(0,Math.ceil((new Date(p.expEndDate+'T00:00:00')-new Date(p.startDate+'T00:00:00'))/86400000))}
+function actDays(p){if(!p.startDate)return 0;var end=p.actEndDate?new Date(p.actEndDate+'T00:00:00'):(p.status==='completed'?new Date(p.expEndDate+'T00:00:00'):new Date(today()+'T00:00:00'));return Math.max(0,Math.ceil((end-new Date(p.startDate+'T00:00:00'))/86400000))}
+function totalHours(p){return (p.hours||[]).reduce(function(s,h){return s+parseFloat(h.hours)},0)}
+function getMember(id){return T().find(function(m){return m.id===id})}
+function getProj(id){return P().find(function(p){return p.id===id})}
+function slabel(s){return{idle:'Idle',active:'Active',waiting:'Waiting',stuck:'Stuck',onhold:'On Hold',stabilizing:'Stabilizing',postlive:'Post-Live',completed:'Completed'}[s]||s}
+function activeBlockers(p){return (p.blockers||[]).filter(function(b){return!b.resolved})}
+function allOpenBlockers(){var r=[];P().forEach(function(p){activeBlockers(p).forEach(function(b){r.push(Object.assign({},b,{pname:p.name,pid:p.id}))})});return r}
+function openScopeIssues(){return DB.scopeIssues.filter(function(s){return!s.resolved})}
+function addActivity(msg){DB.activityLog.unshift({msg:msg,time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),date:today()});if(DB.activityLog.length>60)DB.activityLog.length=60}
+function avatarEl(m,size){if(!m)return'';return'<div class="avt'+(size?' avt-'+size:'')+'" style="background:'+m.bg+';color:'+m.text+'">'+m.code+'</div>'}
+function pillHtml(s){return'<div class="pill '+s+'"><span class="pill-dot"></span>'+slabel(s)+'</div>'}
+function holdLabel(v){return {'client-no-response':'Client not responding','client-requested':'Client requested','waiting-approval':'Awaiting approval','waiting-credentials':'Awaiting credentials','waiting-3rd-party':'Awaiting 3rd party','internal-resource':'Resource unavailable','budget-hold':'Budget hold'}[v]||v}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+/* ═══════════════ NAVIGATION ═══════════════ */
+function nav(v,el){
+  document.querySelectorAll('.page').forEach(function(e){e.classList.remove('active')});
+  document.querySelectorAll('.sb-item').forEach(function(e){e.classList.remove('active')});
+  var pg=document.getElementById('page-'+v);if(pg)pg.classList.add('active');
+  var n=el||document.getElementById('nav-'+v);if(n&&n.classList.contains('sb-item'))n.classList.add('active');
+  else{var nn=document.getElementById('nav-'+v);if(nn)nn.classList.add('active')}
+  renderPage(v);closeSidebar();
+  document.querySelector('.main').scrollTop=0;
+}
+function renderPage(v){
+  ({dashboard:renderDashboard,projects:renderProjects,standup:renderStandup,blockers:renderBlockers,
+    scope:renderScope,delays:renderDelays,moms:renderMoms,notes:renderNotes,reminders:renderReminders,
+    team:renderTeam,workspace:renderWorkspace}[v]||function(){})();
+  updateSidebar();
+}
+function openSidebar(){document.getElementById('sidebar').classList.add('open')}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open')}
+function updateSidebar(){
+  document.getElementById('sb-proj-c').textContent=P().length;
+  document.getElementById('sb-blk-c').textContent=allOpenBlockers().length;
+  document.getElementById('sb-scope-c').textContent=openScopeIssues().length;
+  document.getElementById('sb-rem-c').textContent=DB.reminders.filter(function(r){return!r.done&&r.date<=today()}).length;
+}
+
+/* ═══════════════ DASHBOARD ═══════════════ */
+function mc(label,val,color,icon,sub){return'<div class="metric-card '+color+'"><div class="metric-label">'+label+'</div><div class="metric-value">'+val+'</div>'+(sub?'<div class="metric-sub">'+sub+'</div>':'')+'<div class="metric-icon">'+icon+'</div></div>'}
+function renderDashboard(){
+  var ps=P();
+  var c=function(s){return ps.filter(function(p){return p.status===s}).length};
+  var overdue=ps.filter(function(p){var d=daysUntil(p.expEndDate);return d!==null&&d<0&&p.status!=='completed'});
+  var delayed=ps.filter(function(p){var e=estDays(p),a=actDays(p);return e>0&&a>e&&p.status!=='completed'});
+  var inSupport=ps.filter(function(p){return p.supportActive});
+  var h=new Date().getHours();
+  document.getElementById('dash-greeting').textContent=(h<12?'Good morning':h<17?'Good afternoon':'Good evening')+" — here's your delivery overview";
+  document.getElementById('dash-metrics-1').innerHTML=
+    mc('Total Projects',ps.length,'blue','▢')+mc('Active',c('active'),'green','◉')+
+    mc('Stuck',c('stuck'),'red','⊗')+mc('On Hold',c('onhold'),'orange','◌');
+  document.getElementById('dash-metrics-2').innerHTML=
+    mc('Open Blockers',allOpenBlockers().length,allOpenBlockers().length?'red':'green','△')+
+    mc('Overdue',overdue.length,overdue.length?'red':'green','⏱')+
+    mc('In Support',inSupport.length,'teal','🛡')+
+    mc('Completed',c('completed'),'cyan','✓');
+
+  // health table (no progress)
+  var rows=ps.map(function(p){
+    var ad=actDays(p),ed=estDays(p),over=ed>0&&ad>ed;var du=daysUntil(p.expEndDate);
+    return'<tr><td class="bold">'+esc(p.name)+'</td><td>'+pillHtml(p.status)+'</td>'+
+      '<td style="font-size:12px;'+(over?'color:var(--red-600);font-weight:600':'')+'">'+(over?'+'+(ad-ed)+'d over':ed+'d est')+'</td>'+
+      '<td style="font-size:12px;'+(du!==null&&du<0?'color:var(--red-600);font-weight:600':du!==null&&du<=2?'color:var(--amber-600);font-weight:600':'')+'">'+
+      (p.status==='completed'?'<span style="color:var(--cyan-700)">Done</span>':du===null?'—':du<0?Math.abs(du)+'d overdue':du===0?'Today':du+'d left')+'</td>'+
+      '<td><div class="avt-row">'+p.assigned.map(function(id){return avatarEl(getMember(id))}).join('')+'</div></td></tr>';
+  }).join('');
+  document.getElementById('dash-health-table').innerHTML='<table class="data-table"><thead><tr><th>Project</th><th>Status</th><th>Duration</th><th>Due</th><th>Team</th></tr></thead><tbody>'+(rows||'<tr><td colspan=5 style="text-align:center;color:var(--gray-400)">No projects yet</td></tr>')+'</tbody></table>';
+  document.getElementById('dash-health-count').textContent='('+ps.length+')';
+
+  renderDelayReasonBars('dash-delay-reasons');
+
+  var actions=[];
+  if(c('stuck'))actions.push('🔴 <strong>'+c('stuck')+' stuck</strong> — resolve technical blockers or reassign today.');
+  if(c('onhold'))actions.push('🟠 <strong>'+c('onhold')+' on hold</strong> — chase clients, set a follow-up deadline.');
+  if(overdue.length)actions.push('⏱ <strong>'+overdue.length+' overdue</strong> — '+overdue.map(function(p){return esc(p.name)}).join(', ')+'. Send updated timeline.');
+  if(!actions.length)actions.push('✅ <strong>All clear</strong> — focus on delivery quality and upcoming deadlines.');
+  document.getElementById('dash-top-action').innerHTML=actions.join('<br>');
+
+  // attention
+  var att=ps.filter(function(p){return p.status==='stuck'||p.status==='onhold'||activeBlockers(p).some(function(b){return daysSince(b.since)>=b.sla})});
+  document.getElementById('dash-attention').innerHTML=att.length?att.map(function(p){
+    var cls=p.status==='stuck'?'danger':p.status==='onhold'?'warning':'info';
+    var b=activeBlockers(p)[0];
+    return'<div class="su-alert '+cls+'"><div style="flex:1"><strong>'+esc(p.name)+'</strong> — '+slabel(p.status)+(p.holdReason?' · '+holdLabel(p.holdReason):'')+(b?'<div style="font-size:11px;margin-top:2px;opacity:.85">'+esc(b.title)+'</div>':'')+'</div></div>';
+  }).join(''):'<div class="empty"><div class="empty-icon">✓</div><div class="empty-text">No urgent items</div></div>';
+
+  // upcoming
+  var up=ps.filter(function(p){var d=daysUntil(p.expEndDate);return p.status!=='completed'&&d!==null&&d>=0&&d<=14}).sort(function(a,b){return daysUntil(a.expEndDate)-daysUntil(b.expEndDate)});
+  document.getElementById('dash-upcoming').innerHTML=up.length?up.map(function(p){var d=daysUntil(p.expEndDate);
+    return'<div class="list-row" style="padding:9px 0"><div style="flex:1"><div style="font-weight:600;color:var(--gray-800);font-size:12.5px">'+esc(p.name)+'</div><div style="font-size:11px;color:var(--gray-400)">'+fd(p.expEndDate)+'</div></div><span class="chip" style="background:'+(d<=2?'var(--amber-50)':'var(--blue-50)')+';color:'+(d<=2?'var(--amber-600)':'var(--blue-600)')+'">'+(d===0?'Today':d+'d')+'</span></div>';
+  }).join(''):'<div class="empty"><div class="empty-icon">◷</div><div class="empty-text">Nothing due in 14 days</div></div>';
+
+  // reminders today
+  var todR=DB.reminders.filter(function(r){return!r.done&&r.date<=today()}).slice(0,6);
+  document.getElementById('dash-reminders').innerHTML=todR.length?todR.map(function(r){
+    return'<div class="list-row" style="padding:9px 0"><span style="flex:1;font-size:12.5px;color:var(--gray-700)">'+remIcon(r.cat)+' '+esc(r.text)+'</span><span style="font-size:11px;color:var(--gray-400)">'+r.time+'</span></div>';
+  }).join(''):'<div class="empty"><div class="empty-icon">◉</div><div class="empty-text">No reminders due</div></div>';
+
+  // activity
+  document.getElementById('dash-activity').innerHTML=DB.activityLog.length?DB.activityLog.slice(0,8).map(function(a){
+    return'<div class="activity-item"><div class="activity-dot" style="background:var(--blue-500)"></div><div style="flex:1">'+esc(a.msg)+'</div><div style="font-size:10.5px;color:var(--gray-400)">'+a.time+'</div></div>';
+  }).join(''):'<div class="empty"><div class="empty-icon">◌</div><div class="empty-text">No activity yet</div></div>';
+}
+function renderDelayReasonBars(elId){
+  var counts={};P().forEach(function(p){(p.delayReasons||[]).forEach(function(r){counts[r]=(counts[r]||0)+1})});
+  var labels={'no-deadline':'No clear deadline','client-delay':'Client delays','tech-blocker':'Technical blocker','estimate-wrong':'Wrong estimate','scope-change':'Scope change','dependency':'Dependency','resource':'Resource issue'};
+  var colors={'no-deadline':'#9aa1bb','client-delay':'#f59e0b','tech-blocker':'#ef4444','estimate-wrong':'#8b5cf6','scope-change':'#3b6dff','dependency':'#f97316','resource':'#06b6d4'};
+  var max=Math.max(1,...Object.values(counts).concat([0]));
+  document.getElementById(elId).innerHTML=Object.keys(labels).map(function(k){var c=counts[k]||0;
+    return'<div class="delay-bar-item"><div class="delay-bar-label">'+labels[k]+'</div><div class="delay-bar-track"><div class="delay-bar-fill" style="width:'+(c/max*100)+'%;background:'+colors[k]+'"></div></div><div class="delay-bar-count">'+c+'</div></div>';
+  }).join('');
+}
+function remIcon(c){return {followup:'📞',stuck:'🔴',escalate:'⬆',standup:'☀',focus:'🎯',review:'📋',delivery:'🚀',personal:'🏠'}[c]||'◉'}
+
+/* ═══════════════ PROJECTS ═══════════════ */
+var statusFilter='all';var expandedProjs={};
+function setStatusFilter(s,el){statusFilter=s;document.querySelectorAll('[data-f]').forEach(function(c){c.classList.remove('active')});if(el)el.classList.add('active');renderProjects()}
+function renderProjects(){
+  var search=((document.getElementById('proj-search')||{}).value||'').toLowerCase();
+  var list=P().filter(function(p){
+    if(statusFilter!=='all'&&p.status!==statusFilter)return false;
+    if(search&&!(p.name+' '+p.phase).toLowerCase().includes(search))return false;
+    return true;
+  });
+  document.getElementById('proj-list').innerHTML=list.length?list.map(projCard).join(''):'<div class="empty"><div class="empty-icon">▢</div><div class="empty-text">No projects match.</div></div>';
+}
+function projCard(p){
+  var ad=actDays(p),ed=estDays(p),over=ed>0&&ad>ed,du=daysUntil(p.expEndDate);
+  var bc=activeBlockers(p).length;var open=expandedProjs[p.id];
+  var avts=p.assigned.map(function(id){return avatarEl(getMember(id))}).join('');
+  var dueHtml=p.status==='completed'?'<span style="color:var(--cyan-700)">Done</span>':du===null?'—':du<0?'<span style="color:var(--red-600)">'+Math.abs(du)+'d overdue</span>':du===0?'Today':du+'d left';
+
+  // scope file/link
+  var docBits=[];
+  if(p.scopeLink)docBits.push('<a href="'+esc(p.scopeLink)+'" target="_blank">📎 Open scope link ↗</a>');
+  if(p.scopeFileData)docBits.push('<a href="#" onclick="viewScopeFile(\''+p.id+'\');return false">📄 '+esc(p.scopeFileName||'View PDF')+'</a>');
+
+  var blkActive=activeBlockers(p),blkDone=(p.blockers||[]).filter(function(b){return b.resolved});
+  function blkRow(b,resolved){var past=!resolved&&daysSince(b.since)>=b.sla;
+    return'<div class="blk-item'+(resolved?' resolved':'')+'"><div class="blk-stripe '+(resolved?'done':(b.type==='internal'?'int':'ext'))+'"></div><div class="blk-body">'+
+      '<div class="blk-title">'+esc(b.title)+'</div>'+
+      '<div class="blk-meta"><span class="chip">'+b.type+'</span><span>'+(resolved?'resolved':daysSince(b.since)+'d blocked')+'</span>'+(past?'<span style="color:var(--red-600);font-weight:700">⚠ Escalate</span>':'')+
+      (resolved?'':'<button class="btn btn-success btn-xs" style="margin-left:auto" onclick="event.stopPropagation();resolveBlocker(\''+p.id+'\',\''+b.id+'\')">✓ Resolve</button>')+'</div>'+
+      (b.desc?'<div class="blk-desc">'+esc(b.desc)+'</div>':'')+'</div></div>';}
+
+  var supportHtml=p.supportActive?'<span class="support-badge">🛡 Support: '+fd(p.supportStart)+' → '+fd(p.supportEnd)+'</span>':'';
+
+  return'<div class="proj-card '+p.status+(open?' open':'')+'">'+
+    '<div class="proj-row" onclick="toggleProj(\''+p.id+'\')">'+
+      '<span class="proj-chevron">▶</span>'+
+      '<div class="proj-name-block"><div class="pname">'+esc(p.name)+(supportHtml?' '+supportHtml:'')+'</div><div class="pphase">'+esc(p.phase||'')+'</div></div>'+
+      '<div class="proj-meta-col keep">'+pillHtml(p.status)+(bc?'<div style="font-size:10px;color:var(--red-600);margin-top:4px;font-weight:600">'+bc+' blocker'+(bc>1?'s':'')+'</div>':'')+'</div>'+
+      '<div class="proj-meta-col"><div class="lbl">Est / Actual</div><div class="val" style="'+(over?'color:var(--red-600)':'')+'">'+ed+'d / '+ad+'d</div></div>'+
+      '<div class="proj-meta-col"><div class="lbl">Due</div><div class="val">'+dueHtml+'</div></div>'+
+      '<div class="proj-meta-col"><div class="avt-row">'+avts+'</div></div>'+
+    '</div>'+
+    '<div class="proj-expanded">'+
+      (p.holdReason?'<div class="hold-banner">⏸ On hold — '+holdLabel(p.holdReason)+'</div>':'')+
+      '<div class="exp-grid">'+
+        '<div class="exp-box"><div class="exp-box-title">📋 Planned Scope</div><div class="exp-text'+(p.scopePlanned?'':' muted')+'">'+(esc(p.scopePlanned)||'No planned scope recorded')+'</div></div>'+
+        '<div class="exp-box"><div class="exp-box-title">➕ Added Scope &amp; Extra Work</div><div class="exp-text'+(p.scopeAdded?'':' muted')+'">'+(esc(p.scopeAdded)||'No additions recorded')+'</div></div>'+
+      '</div>'+
+      (p.deps||docBits.length||p.notes?'<div class="exp-grid" style="margin-top:14px">'+
+        '<div class="exp-box"><div class="exp-box-title">🔗 Dependencies &amp; Documents</div>'+
+          '<div class="exp-text'+(p.deps?'':' muted')+'">'+(esc(p.deps)||'No dependencies')+'</div>'+
+          (docBits.length?'<div style="margin-top:8px;display:flex;flex-direction:column;gap:5px;font-size:12px">'+docBits.join('')+'</div>':'')+'</div>'+
+        '<div class="exp-box"><div class="exp-box-title">📝 Internal Notes</div><div class="exp-text'+(p.notes?'':' muted')+'">'+(esc(p.notes)||'No notes')+'</div></div>'+
+      '</div>':'')+
+      '<div class="exp-grid" style="margin-top:14px">'+
+        '<div class="exp-box"><div class="exp-box-title">⚠ Blockers '+(blkDone.length?'· '+blkDone.length+' resolved':'')+'</div>'+
+          (blkActive.length?blkActive.map(function(b){return blkRow(b,false)}).join(''):'<div style="font-size:12px;color:var(--green-600);padding:2px 0">✓ No active blockers</div>')+
+          (blkDone.length?blkDone.map(function(b){return blkRow(b,true)}).join(''):'')+
+          '<button class="btn btn-secondary btn-xs" style="margin-top:8px" onclick="event.stopPropagation();openBlockerModal(\''+p.id+'\')">+ Log Blocker</button></div>'+
+        '<div class="exp-box"><div class="exp-box-title">⏱ Hours Log · '+totalHours(p).toFixed(1)+'h</div>'+
+          ((p.hours&&p.hours.length)?p.hours.map(function(h){var m=getMember(h.member);return'<div class="list-row" style="padding:6px 0;font-size:12px"><span style="color:var(--gray-400);min-width:54px">'+fd(h.date)+'</span><span style="font-weight:600">'+h.hours+'h</span><span style="color:var(--gray-500)">'+(m?m.name:'')+'</span><span style="flex:1;color:var(--gray-500)">'+esc(h.desc||'')+'</span><button class="btn btn-danger btn-xs" onclick="event.stopPropagation();removeHours(\''+p.id+'\',\''+h.id+'\')">✕</button></div>'}).join(''):'<div style="font-size:12px;color:var(--gray-400)">No hours logged</div>')+
+          '<button class="btn btn-secondary btn-xs" style="margin-top:8px" onclick="event.stopPropagation();openHoursModal(\''+p.id+'\')">+ Log Hours</button></div>'+
+      '</div>'+
+      '<div class="proj-toolbar">'+
+        '<select class="mini-select" onclick="event.stopPropagation()" onchange="changeStatus(\''+p.id+'\',this.value)">'+
+          ['idle','active','waiting','stuck','onhold','stabilizing','postlive','completed'].map(function(s){return'<option value="'+s+'"'+(p.status===s?' selected':'')+'>'+slabel(s)+'</option>'}).join('')+'</select>'+
+        '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();toggleSupport(\''+p.id+'\')">'+(p.supportActive?'⏹ End Support':'🛡 Start Support')+'</button>'+
+        '<span style="margin-left:auto;font-size:11px;color:var(--gray-400)">'+fd(p.startDate)+' → '+fd(p.expEndDate)+(p.actEndDate?' (act '+fd(p.actEndDate)+')':'')+'</span>'+
+        '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openProjModal(\''+p.id+'\')">✎ Edit</button>'+
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteProj(\''+p.id+'\')">✕</button>'+
+      '</div>'+
+    '</div></div>';
+}
+function toggleProj(id){expandedProjs[id]=!expandedProjs[id];renderProjects()}
+function changeStatus(id,s){var p=getProj(id);if(!p)return;p.status=s;addActivity(p.name+' → '+slabel(s));saveDB();renderProjects();updateSidebar()}
+function resolveBlocker(pid,bid){var p=getProj(pid);if(!p)return;var b=p.blockers.find(function(x){return x.id===bid});if(b){b.resolved=true;b.resolvedDate=today();addActivity('Blocker resolved: '+b.title)}saveDB();renderPage(curPage());updateSidebar();toast('Blocker resolved','success')}
+function deleteProj(id){if(!confirm('Delete this project and all its data?'))return;DB.projects=P().filter(function(p){return p.id!==id});addActivity('Project deleted');saveDB();renderProjects();updateSidebar();toast('Project deleted')}
+function toggleSupport(id){var p=getProj(id);if(!p)return;if(p.supportActive){p.supportActive=false;addActivity('Support ended: '+p.name)}else{p.supportActive=true;if(!p.supportStart){p.supportStart=today();p.supportEnd=addDays(today(),30)}addActivity('Support started: '+p.name)}saveDB();renderProjects();renderDashboard();toast(p.supportActive?'Support started':'Support ended','success')}
+function removeHours(pid,hid){var p=getProj(pid);if(!p)return;p.hours=p.hours.filter(function(h){return h.id!==hid});saveDB();renderProjects()}
+function curPage(){var a=document.querySelector('.page.active');return a?a.id.replace('page-',''):'dashboard'}
+
+/* ═══════════════ STANDUP ═══════════════ */
+function renderStandup(){
+  document.getElementById('su-date-sub').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  // live alerts
+  var alerts=[];
+  P().forEach(function(p){
+    if(p.status==='stuck')alerts.push({c:'danger',m:'<strong>'+esc(p.name)+'</strong> stuck — '+esc((activeBlockers(p)[0]||{title:'no blocker logged'}).title)});
+    if(p.status==='onhold')alerts.push({c:'warning',m:'<strong>'+esc(p.name)+'</strong> on hold — '+holdLabel(p.holdReason||'')+'. Follow up.'});
+    activeBlockers(p).forEach(function(b){if(daysSince(b.since)>=b.sla)alerts.push({c:'danger',m:'<strong>'+esc(p.name)+'</strong>: "'+esc(b.title)+'" past SLA — escalate.'})});
+    var du=daysUntil(p.expEndDate);if(du!==null&&du<0&&p.status!=='completed')alerts.push({c:'warning',m:'<strong>'+esc(p.name)+'</strong> '+Math.abs(du)+'d overdue.'});
+    if(du===0&&p.status!=='completed')alerts.push({c:'info',m:'<strong>'+esc(p.name)+'</strong> due <strong>today</strong>.'});
+  });
+  document.getElementById('su-alerts').innerHTML=alerts.length?alerts.map(function(a){return'<div class="su-alert '+a.c+'">⚡ '+a.m+'</div>'}).join(''):'<div class="su-alert success">✓ No critical signals — clean board today.</div>';
+  // log
+  var log=DB.standups.slice().sort(function(a,b){return b.date<a.date?-1:1});
+  document.getElementById('su-log-count').textContent='('+log.length+')';
+  document.getElementById('su-log').innerHTML=log.length?log.map(function(s){
+    return'<div class="su-entry"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
+      '<div class="su-entry-date">☀ '+fd(s.date)+(s.focus?'<span class="chip" style="background:var(--blue-50);color:var(--blue-600)">🎯 '+esc(s.focus)+'</span>':'')+'</div>'+
+      '<div style="display:flex;gap:6px"><button class="btn btn-secondary btn-xs" onclick="openStandupModal(\''+s.id+'\')">✎</button><button class="btn btn-danger btn-xs" onclick="deleteStandup(\''+s.id+'\')">✕</button></div></div>'+
+      '<div class="su-entry-body">'+esc(s.notes||'')+'</div></div>';
+  }).join(''):'<div class="empty"><div class="empty-icon">☀</div><div class="empty-text">No standups logged yet. Add today\'s after your call.</div></div>';
+}
+var editingStandupId=null;
+function openStandupModal(id){editingStandupId=id||null;var s=id?DB.standups.find(function(x){return x.id===id}):null;
+  document.getElementById('standup-modal-title').textContent=s?'Edit Standup':'Add Standup';
+  document.getElementById('su-date').value=s?s.date:today();
+  document.getElementById('su-focus').value=s?s.focus:'';
+  document.getElementById('su-notes').value=s?s.notes:'';
+  openModal('standup-modal');
+}
+function saveStandup(){
+  var date=document.getElementById('su-date').value||today();
+  var data={date:date,focus:document.getElementById('su-focus').value.trim(),notes:document.getElementById('su-notes').value.trim()};
+  if(!data.notes&&!data.focus)return toast('Add some notes','danger');
+  if(editingStandupId){Object.assign(DB.standups.find(function(x){return x.id===editingStandupId}),data)}
+  else{DB.standups.push(Object.assign({id:uid()},data));addActivity('Standup logged for '+fd(date))}
+  saveDB();closeModal('standup-modal');renderStandup();toast('Standup saved','success');
+}
+function deleteStandup(id){if(!confirm('Delete this standup entry?'))return;DB.standups=DB.standups.filter(function(s){return s.id!==id});saveDB();renderStandup()}
+
+/* ═══════════════ BLOCKERS PAGE ═══════════════ */
+var blkFilter='open';
+function setBlkFilter(f,el){blkFilter=f;document.querySelectorAll('[data-bf]').forEach(function(c){c.classList.remove('active')});if(el)el.classList.add('active');renderBlockers()}
+function renderBlockers(){
+  var all=[];P().forEach(function(p){(p.blockers||[]).forEach(function(b){all.push(Object.assign({},b,{pname:p.name,pid:p.id}))})});
+  var open=all.filter(function(b){return!b.resolved}),done=all.filter(function(b){return b.resolved});
+  var pastSla=open.filter(function(b){return daysSince(b.since)>=b.sla});
+  document.getElementById('blk-metrics').innerHTML=mc('Active Blockers',open.length,open.length?'red':'green','△')+mc('Past SLA',pastSla.length,pastSla.length?'red':'green','⚠')+mc('Resolved',done.length,'cyan','✓');
+  var show=blkFilter==='open'?open:blkFilter==='resolved'?done:all;
+  if(!show.length){document.getElementById('blk-list').innerHTML='<div class="empty"><div class="empty-icon">'+(blkFilter==='resolved'?'✓':'△')+'</div><div class="empty-text">Nothing here.</div></div>';return}
+  document.getElementById('blk-list').innerHTML='<div class="card" style="padding:16px">'+show.map(function(b){
+    var past=!b.resolved&&daysSince(b.since)>=b.sla;
+    return'<div class="blk-item'+(b.resolved?' resolved':'')+'"><div class="blk-stripe '+(b.resolved?'done':b.type==='internal'?'int':'ext')+'"></div><div class="blk-body">'+
+      '<div class="blk-title">'+esc(b.title)+'</div>'+
+      '<div class="blk-meta"><span class="chip" style="background:var(--blue-50);color:var(--blue-600)">'+esc(b.pname)+'</span><span class="chip">'+b.type+'</span>'+
+      '<span>'+(b.resolved?'resolved '+fd(b.resolvedDate):daysSince(b.since)+'d blocked · SLA '+b.sla+'d')+'</span>'+(past?'<span style="color:var(--red-600);font-weight:700">⚠ PAST SLA</span>':'')+
+      (b.resolved?'':'<button class="btn btn-success btn-xs" style="margin-left:auto" onclick="resolveBlocker(\''+b.pid+'\',\''+b.id+'\')">✓ Resolve</button>')+'</div>'+
+      (b.desc?'<div class="blk-desc">'+esc(b.desc)+'</div>':'')+'</div></div>';
+  }).join('')+'</div>';
+}
+
+/* ═══════════════ SCOPE & BUGS ═══════════════ */
+var scopeFilter='open';
+function setScopeFilter(f,el){scopeFilter=f;document.querySelectorAll('[data-sf]').forEach(function(c){c.classList.remove('active')});if(el)el.classList.add('active');renderScope()}
+function renderScope(){
+  var all=DB.scopeIssues,open=all.filter(function(s){return!s.resolved}),done=all.filter(function(s){return s.resolved});
+  var bugs=open.filter(function(s){return s.type==='bug'||s.type==='regression'});
+  document.getElementById('scope-metrics').innerHTML=mc('Open Issues',open.length,open.length?'amber':'green','◈')+mc('Open Bugs',bugs.length,bugs.length?'red':'green','🐛')+mc('Scope Additions',open.filter(function(s){return s.type==='scope-add'}).length,'purple','📌')+mc('Completed',done.length,'green','✓');
+  var show=scopeFilter==='open'?open:scopeFilter==='resolved'?done:all;
+  if(!show.length){document.getElementById('scope-list').innerHTML='<div class="empty"><div class="empty-icon">◈</div><div class="empty-text">No issues here.</div></div>';return}
+  var typeLabel={bug:'🐛 Bug',['scope-add']:'📌 Scope add',missed:'⚠ Missed',regression:'↩ Regression',performance:'⚡ Perf',training:'📚 Training'};
+  document.getElementById('scope-list').innerHTML='<div class="card" style="padding:16px">'+show.map(function(s){
+    var p=getProj(s.projectId);
+    return'<div class="blk-item'+(s.resolved?' resolved':'')+'"><div class="blk-stripe '+(s.resolved?'done':s.severity==='critical'||s.severity==='high'?'int':'ext')+'"></div><div class="blk-body">'+
+      '<div class="blk-title">'+esc(s.title)+'</div>'+
+      '<div class="blk-meta"><span class="chip" style="background:var(--blue-50);color:var(--blue-600)">'+esc(p?p.name:'—')+'</span><span class="chip">'+(typeLabel[s.type]||s.type)+'</span><span class="tag tag-'+(s.resolved?'done':s.severity)+'">'+(s.resolved?'Completed':s.severity)+'</span><span>'+fd(s.date)+'</span>'+
+      (s.resolved?'':'<button class="btn btn-success btn-xs" style="margin-left:auto" onclick="resolveScope(\''+s.id+'\')">✓ Mark Done</button>')+'</div>'+
+      (s.notes?'<div class="blk-desc">'+esc(s.notes)+'</div>':'')+'</div></div>';
+  }).join('')+'</div>';
+}
+function resolveScope(id){var s=DB.scopeIssues.find(function(x){return x.id===id});if(s){s.resolved=true;s.resolvedDate=today();addActivity('Issue completed: '+s.title)}saveDB();renderScope();updateSidebar();toast('Marked done','success')}
+
+/* ═══════════════ DELAY ANALYSIS ═══════════════ */
+function renderDelays(){
+  var ps=P();
+  var delayed=ps.filter(function(p){var e=estDays(p),a=actDays(p);return e>0&&a>e});
+  var avg=delayed.length?delayed.reduce(function(s,p){return s+(actDays(p)-estDays(p))},0)/delayed.length:0;
+  var onTime=ps.filter(function(p){return p.status==='completed'}).filter(function(p){return actDays(p)<=estDays(p)}).length;
+  document.getElementById('delay-metrics').innerHTML=mc('Projects Delayed',delayed.length,delayed.length?'red':'green','⏱')+mc('Avg Overrun',avg.toFixed(1)+'d','amber','△')+mc('On-Time Delivered',onTime,'green','✓')+mc('Total Est Days',ps.reduce(function(s,p){return s+estDays(p)},0),'blue','▢');
+  var max=Math.max(1,...ps.map(function(p){return Math.max(estDays(p),actDays(p))+2}));
+  document.getElementById('delay-timeline').innerHTML=ps.length?ps.map(function(p){
+    var ed=estDays(p),ad=actDays(p),over=ad>ed&&ed>0;var color=over?'#ef4444':p.status==='completed'?'#10b981':'#3b6dff';
+    return'<div class="tl-row"><div class="tl-name"><div style="font-size:12px;font-weight:600;color:var(--gray-800)">'+esc(p.name)+'</div><div style="font-size:10.5px;color:var(--gray-400)">'+slabel(p.status)+'</div></div>'+
+      '<div class="tl-track"><div class="tl-bar-est" style="left:0;width:'+Math.min(ed/max*100,100)+'%"></div><div class="tl-bar-act" style="left:0;width:'+Math.min(ad/max*100,100)+'%;background:'+color+'"></div></div>'+
+      '<div class="tl-stats"><div style="font-size:12px;font-weight:700;color:'+(over?'var(--red-600)':'var(--gray-800)')+'">'+ad+'d actual</div><div style="font-size:11px;color:var(--gray-400)">Est '+ed+'d'+(over?' <strong style="color:var(--red-500)">+'+(ad-ed)+'d</strong>':'')+'</div></div></div>';
+  }).join(''):'<div class="empty"><div class="empty-text">No projects</div></div>';
+  renderDelayReasonBars('delay-causes');
+  var rl={'no-deadline':'No deadline','client-delay':'Client','tech-blocker':'Tech','estimate-wrong':'Estimate','scope-change':'Scope','dependency':'Dependency','resource':'Resource'};
+  document.getElementById('delay-detail-table').innerHTML='<table class="data-table"><thead><tr><th>Project</th><th>Start</th><th>Est End</th><th>Actual End</th><th>Est</th><th>Actual</th><th>Overrun</th><th>Reasons</th></tr></thead><tbody>'+
+    ps.map(function(p){var ed=estDays(p),ad=actDays(p),ov=Math.max(0,ad-ed);
+      return'<tr><td class="bold">'+esc(p.name)+'</td><td>'+fd(p.startDate)+'</td><td>'+fd(p.expEndDate)+'</td><td>'+fd(p.actEndDate)+'</td><td>'+ed+'d</td><td>'+ad+'d</td><td style="'+(ov>0?'color:var(--red-600);font-weight:700':'color:var(--green-600)')+'">'+(ov>0?'+'+ov+'d':'on time')+'</td><td style="font-size:11px">'+((p.delayReasons||[]).map(function(r){return rl[r]||r}).join(', ')||'—')+'</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+/* ═══════════════ MEETING MoM ═══════════════ */
+var editingMomId=null;
+function renderMoms(){
+  var list=DB.moms.slice().sort(function(a,b){return b.date<a.date?-1:1});
+  document.getElementById('mom-list').innerHTML=list.length?list.map(function(m){
+    return'<div class="note-card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">'+
+      '<div><div style="font-size:14px;font-weight:700;color:var(--gray-900)">'+esc(m.title)+'</div><div style="font-size:11.5px;color:var(--gray-400);margin-top:2px">'+fd(m.date)+(m.attendees?' · '+esc(m.attendees):'')+'</div></div>'+
+      '<div style="display:flex;gap:6px"><button class="btn btn-secondary btn-xs" onclick="openMomModal(\''+m.id+'\')">✎</button><button class="btn btn-danger btn-xs" onclick="deleteMom(\''+m.id+'\')">✕</button></div></div>'+
+      (m.agenda?'<div style="margin-top:6px"><div class="exp-box-title">Discussion</div><div class="exp-text">'+esc(m.agenda)+'</div></div>':'')+
+      (m.decisions?'<div style="margin-top:10px"><div class="exp-box-title">Decisions</div><div class="exp-text">'+esc(m.decisions)+'</div></div>':'')+
+      (m.actions?'<div style="margin-top:10px"><div class="exp-box-title">Action Items</div><div class="exp-text">'+esc(m.actions)+'</div></div>':'')+
+      '<div style="margin-top:10px"><button class="btn btn-secondary btn-xs" onclick="exportMom(\''+m.id+'\')">⤓ Export .txt</button></div></div>';
+  }).join(''):'<div class="empty"><div class="empty-icon">▤</div><div class="empty-text">No meeting minutes yet.</div></div>';
+}
+function openMomModal(id){editingMomId=id||null;var m=id?DB.moms.find(function(x){return x.id===id}):null;
+  document.getElementById('mom-modal-title').textContent=m?'Edit MoM':'New Meeting MoM';
+  document.getElementById('mom-title').value=m?m.title:'';document.getElementById('mom-date').value=m?m.date:today();
+  document.getElementById('mom-attendees').value=m?m.attendees:'';document.getElementById('mom-agenda').value=m?m.agenda:'';
+  document.getElementById('mom-decisions').value=m?m.decisions:'';document.getElementById('mom-actions').value=m?m.actions:'';
+  openModal('mom-modal');
+}
+function saveMom(){var t=document.getElementById('mom-title').value.trim();if(!t)return toast('Title required','danger');
+  var data={title:t,date:document.getElementById('mom-date').value||today(),attendees:document.getElementById('mom-attendees').value.trim(),agenda:document.getElementById('mom-agenda').value.trim(),decisions:document.getElementById('mom-decisions').value.trim(),actions:document.getElementById('mom-actions').value.trim()};
+  if(editingMomId){Object.assign(DB.moms.find(function(x){return x.id===editingMomId}),data)}else{DB.moms.push(Object.assign({id:uid()},data));addActivity('MoM added: '+t)}
+  saveDB();closeModal('mom-modal');renderMoms();toast('MoM saved','success');
+}
+function deleteMom(id){if(!confirm('Delete this MoM?'))return;DB.moms=DB.moms.filter(function(m){return m.id!==id});saveDB();renderMoms()}
+function exportMom(id){var m=DB.moms.find(function(x){return x.id===id});if(!m)return;
+  var txt='MEETING MINUTES\n================\nTitle: '+m.title+'\nDate: '+m.date+'\nAttendees: '+(m.attendees||'-')+'\n\nDISCUSSION\n'+(m.agenda||'-')+'\n\nDECISIONS\n'+(m.decisions||'-')+'\n\nACTION ITEMS\n'+(m.actions||'-')+'\n';
+  downloadTxt((m.title||'MoM').replace(/[^a-z0-9]+/gi,'_')+'.txt',txt);
+}
+
+/* ═══════════════ RAW NOTES ═══════════════ */
+var editingNoteId=null;
+function renderNotes(){
+  var list=DB.notes.slice().sort(function(a,b){return (b.updated||'')<(a.updated||'')?-1:1});
+  document.getElementById('notes-list').innerHTML=list.length?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:13px">'+list.map(function(n){
+    return'<div class="note-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px"><div style="font-size:13.5px;font-weight:700;color:var(--gray-900)">'+esc(n.title||'Untitled')+'</div></div>'+
+      '<div class="exp-text" style="max-height:140px;overflow:hidden;font-size:12px">'+esc(n.body||'')+'</div>'+
+      '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn btn-secondary btn-xs" onclick="openNoteModal(\''+n.id+'\')">✎ Edit</button><button class="btn btn-secondary btn-xs" onclick="exportNote(\''+n.id+'\')">⤓ .txt</button><button class="btn btn-danger btn-xs" onclick="deleteNote(\''+n.id+'\')">✕</button></div></div>';
+  }).join('')+'</div>':'<div class="empty"><div class="empty-icon">✎</div><div class="empty-text">No notes yet.</div></div>';
+}
+function openNoteModal(id){editingNoteId=id||null;var n=id?DB.notes.find(function(x){return x.id===id}):null;
+  document.getElementById('note-modal-title').textContent=n?'Edit Note':'New Note';
+  document.getElementById('note-title').value=n?n.title:'';document.getElementById('note-body').value=n?n.body:'';openModal('note-modal');
+}
+function saveNote(){var data={title:document.getElementById('note-title').value.trim(),body:document.getElementById('note-body').value,updated:new Date().toISOString()};
+  if(!data.title&&!data.body)return toast('Note is empty','danger');
+  if(editingNoteId){Object.assign(DB.notes.find(function(x){return x.id===editingNoteId}),data)}else{DB.notes.push(Object.assign({id:uid()},data))}
+  saveDB();closeModal('note-modal');renderNotes();toast('Note saved','success');
+}
+function deleteNote(id){if(!confirm('Delete this note?'))return;DB.notes=DB.notes.filter(function(n){return n.id!==id});saveDB();renderNotes()}
+function exportNote(id){var n=DB.notes.find(function(x){return x.id===id});if(!n)return;downloadTxt((n.title||'note').replace(/[^a-z0-9]+/gi,'_')+'.txt',(n.title?n.title+'\n'+'='.repeat(n.title.length)+'\n\n':'')+(n.body||''))}
+function downloadTxt(name,text){var blob=new Blob([text],{type:'text/plain'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);toast('Exported '+name,'success')}
+
+/* ═══════════════ REMINDERS ═══════════════ */
+function renderReminders(){
+  var list=DB.reminders.slice().sort(function(a,b){return (a.done?1:0)-(b.done?1:0)||(a.date+a.time<b.date+b.time?-1:1)});
+  document.getElementById('rem-list').innerHTML=list.length?list.map(function(r){var p=getProj(r.projId);var overdue=!r.done&&r.date<today();
+    return'<div class="list-row"><input type="checkbox" '+(r.done?'checked':'')+' onchange="toggleReminder(\''+r.id+'\')" style="width:16px;height:16px">'+
+      '<div style="flex:1;'+(r.done?'opacity:.5;text-decoration:line-through':'')+'"><div style="font-size:12.5px;color:var(--gray-800);font-weight:500">'+remIcon(r.cat)+' '+esc(r.text)+'</div>'+
+      '<div style="font-size:11px;color:'+(overdue?'var(--red-600)':'var(--gray-400)')+';margin-top:2px">'+fd(r.date)+' · '+r.time+(p?' · '+esc(p.name):'')+(overdue?' · overdue':'')+'</div></div>'+
+      '<button class="btn btn-danger btn-xs" onclick="deleteReminder(\''+r.id+'\')">✕</button></div>';
+  }).join(''):'<div class="empty"><div class="empty-icon">◉</div><div class="empty-text">No reminders.</div></div>';
+}
+function toggleReminder(id){var r=DB.reminders.find(function(x){return x.id===id});if(r)r.done=!r.done;saveDB();renderReminders();updateSidebar()}
+function deleteReminder(id){DB.reminders=DB.reminders.filter(function(r){return r.id!==id});saveDB();renderReminders();updateSidebar()}
+
+/* ═══════════════ TEAM ═══════════════ */
+function renderTeam(){
+  document.getElementById('team-grid').innerHTML=T().map(function(m){
+    var myP=P().filter(function(p){return p.assigned.includes(m.id)&&p.status!=='completed'});
+    var load=Math.min(100,myP.length*33);var lc=load>75?'#ef4444':load>50?'#f59e0b':'#10b981';
+    return'<div class="note-card" style="text-align:center"><div class="avt avt-lg" style="margin:0 auto 8px;background:'+m.bg+';color:'+m.text+'">'+m.code+'</div>'+
+      '<div style="font-size:14px;font-weight:700;color:var(--gray-900)">'+esc(m.name)+'</div><div style="font-size:11.5px;color:var(--gray-400);margin-bottom:8px">'+esc(m.role)+'</div>'+
+      '<div style="font-size:11px;color:var(--gray-500);margin-bottom:6px">'+myP.length+' active</div>'+
+      '<div style="height:6px;background:var(--gray-100);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+load+'%;background:'+lc+'"></div></div>'+
+      '<div style="display:flex;gap:6px;margin-top:12px;justify-content:center"><button class="btn btn-secondary btn-xs" onclick="openTeamModal(\''+m.id+'\')">Edit</button><button class="btn btn-danger btn-xs" onclick="deleteMember(\''+m.id+'\')">Remove</button></div></div>';
+  }).join('');
+  document.getElementById('team-workload').innerHTML='<table class="data-table"><thead><tr><th>Member</th><th>Role</th><th>Projects</th><th>Active</th><th>Hours</th></tr></thead><tbody>'+
+    T().map(function(m){var myP=P().filter(function(p){return p.assigned.includes(m.id)});var act=myP.filter(function(p){return p.status==='active'});
+      var hrs=myP.reduce(function(s,p){return s+(p.hours||[]).filter(function(h){return h.member===m.id}).reduce(function(x,h){return x+parseFloat(h.hours)},0)},0);
+      return'<tr><td><div style="display:flex;align-items:center;gap:8px">'+avatarEl(m)+'<span class="bold">'+esc(m.name)+'</span></div></td><td style="color:var(--gray-500)">'+esc(m.role)+'</td><td>'+myP.length+'</td><td>'+(act.length>1?'<span style="color:var(--amber-600);font-weight:600">'+act.length+' ⚠</span>':act.length)+'</td><td>'+hrs.toFixed(1)+'h</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+/* ═══════════════ WORKSPACE (leave + drive) ═══════════════ */
+function renderWorkspace(){
+  var lv=DB.leaves.slice().sort(function(a,b){return b.from<a.from?-1:1});
+  var totalDays=lv.reduce(function(s,l){return s+parseFloat(l.days||0)},0);
+  document.getElementById('leave-list').innerHTML='<table class="data-table"><thead><tr><th>From</th><th>To</th><th>Type</th><th>Days</th><th>Reason</th><th></th></tr></thead><tbody>'+
+    (lv.length?lv.map(function(l){return'<tr><td>'+fd(l.from)+'</td><td>'+fd(l.to)+'</td><td><span class="chip">'+esc(l.type)+'</span></td><td class="bold">'+l.days+'</td><td style="color:var(--gray-500)">'+esc(l.reason||'')+'</td><td><button class="btn btn-danger btn-xs" onclick="deleteLeave(\''+l.id+'\')">✕</button></td></tr>'}).join('')+'<tr><td colspan="3" style="font-weight:700">Total</td><td class="bold">'+totalDays+'</td><td colspan="2"></td></tr>':'<tr><td colspan="6" style="text-align:center;color:var(--gray-400)">No leave records</td></tr>')+'</tbody></table>';
+  var dl=DB.driveLinks;
+  document.getElementById('drive-list').innerHTML=dl.length?dl.map(function(d){
+    return'<div class="list-row"><div style="flex:1"><a href="'+esc(d.url)+'" target="_blank" style="font-size:12.5px;font-weight:600">🗂 '+esc(d.label)+' ↗</a>'+(d.cat?'<div style="font-size:11px;color:var(--gray-400);margin-top:2px">'+esc(d.cat)+'</div>':'')+'</div><button class="btn btn-danger btn-xs" onclick="deleteDrive(\''+d.id+'\')">✕</button></div>';
+  }).join(''):'<div class="empty"><div class="empty-icon">🗂</div><div class="empty-text">No drive links saved.</div></div>';
+}
+function openLeaveModal(){document.getElementById('lv-from').value=today();document.getElementById('lv-to').value=today();document.getElementById('lv-type').value='Casual';document.getElementById('lv-days').value=1;document.getElementById('lv-reason').value='';openModal('leave-modal')}
+function saveLeave(){var from=document.getElementById('lv-from').value;if(!from)return toast('From date required','danger');
+  DB.leaves.push({id:uid(),from:from,to:document.getElementById('lv-to').value||from,type:document.getElementById('lv-type').value,days:parseFloat(document.getElementById('lv-days').value)||1,reason:document.getElementById('lv-reason').value.trim()});
+  saveDB();closeModal('leave-modal');renderWorkspace();toast('Leave saved','success');
+}
+function deleteLeave(id){DB.leaves=DB.leaves.filter(function(l){return l.id!==id});saveDB();renderWorkspace()}
+function openDriveModal(){document.getElementById('dl-label').value='';document.getElementById('dl-url').value='';document.getElementById('dl-cat').value='';openModal('drive-modal')}
+function saveDrive(){var label=document.getElementById('dl-label').value.trim(),url=document.getElementById('dl-url').value.trim();if(!label||!url)return toast('Label and URL required','danger');
+  DB.driveLinks.push({id:uid(),label:label,url:url,cat:document.getElementById('dl-cat').value.trim()});saveDB();closeModal('drive-modal');renderWorkspace();toast('Link saved','success');
+}
+function deleteDrive(id){DB.driveLinks=DB.driveLinks.filter(function(d){return d.id!==id});saveDB();renderWorkspace()}
+
+/* ═══════════════ PROJECT MODAL ═══════════════ */
+var editingProjId=null,selectedDelayReasons=[],pendingScopeFile=null;
+function openProjModal(id){
+  editingProjId=id||null;selectedDelayReasons=[];pendingScopeFile=null;
+  var p=id?getProj(id):null;
+  document.getElementById('proj-modal-title').textContent=p?'Edit Project':'New Project';
+  var asel=document.getElementById('p-assigned');asel.innerHTML=T().map(function(m){return'<option value="'+m.id+'">'+esc(m.name)+'</option>'}).join('');
+  document.getElementById('p-name').value=p?p.name:'';document.getElementById('p-phase').value=p?p.phase:'';
+  document.getElementById('p-status').value=p?p.status:'active';
+  document.getElementById('p-start').value=p?p.startDate:today();
+  document.getElementById('p-exp-end').value=p?p.expEndDate:'';document.getElementById('p-act-end').value=p?p.actEndDate:'';
+  document.getElementById('p-support-active').checked=p?!!p.supportActive:false;
+  document.getElementById('p-support-start').value=p?p.supportStart:'';document.getElementById('p-support-end').value=p?p.supportEnd:'';
+  document.getElementById('p-support-len').value='';
+  document.getElementById('p-scope-planned').value=p?(p.scopePlanned||''):'';
+  document.getElementById('p-scope-added').value=p?(p.scopeAdded||''):'';
+  document.getElementById('p-scope-link').value=p?(p.scopeLink||''):'';
+  document.getElementById('p-scope-file').value='';
+  document.getElementById('p-scope-file-hint').textContent=p&&p.scopeFileName?('Current: '+p.scopeFileName+' — choose a new file to replace.'):'Stored inside this tool. Keep under ~2 MB — for large files use the Drive link.';
+  document.getElementById('p-deps').value=p?(p.deps||''):'';document.getElementById('p-hold-reason').value=p?(p.holdReason||''):'';
+  document.getElementById('p-notes').value=p?(p.notes||''):'';
+  if(p)Array.from(asel.options).forEach(function(o){o.selected=p.assigned.includes(o.value)});
+  if(p)(p.delayReasons||[]).forEach(function(r){selectedDelayReasons.push(r)});
+  document.querySelectorAll('#delay-reason-picker .delay-reason-tag').forEach(function(el){el.classList.toggle('sel',selectedDelayReasons.includes(el.getAttribute('data-r')))});
+  toggleSupportFields();openModal('proj-modal');
+}
+function toggleSupportFields(){document.getElementById('support-fields').style.display=document.getElementById('p-support-active').checked?'grid':'none'}
+function quickSupport(){var len=document.getElementById('p-support-len').value;if(!len)return;var base=document.getElementById('p-support-start').value||document.getElementById('p-act-end').value||document.getElementById('p-exp-end').value||today();document.getElementById('p-support-start').value=base;document.getElementById('p-support-end').value=addDays(base,parseInt(len))}
+function toggleDelayTag(el){var r=el.getAttribute('data-r');var i=selectedDelayReasons.indexOf(r);if(i>-1){selectedDelayReasons.splice(i,1);el.classList.remove('sel')}else{selectedDelayReasons.push(r);el.classList.add('sel')}}
+function handleScopeFile(input){var f=input.files[0];if(!f){pendingScopeFile=null;return}
+  if(f.size>2.5*1024*1024){toast('File >2.5MB — use the Drive link instead','danger');input.value='';pendingScopeFile=null;return}
+  var rd=new FileReader();rd.onload=function(){pendingScopeFile={name:f.name,data:rd.result}};rd.readAsDataURL(f);
+}
+function saveProject(){
+  var name=document.getElementById('p-name').value.trim();if(!name)return toast('Project name required','danger');
+  var assigned=Array.from(document.getElementById('p-assigned').selectedOptions).map(function(o){return o.value});
+  var data={name:name,phase:document.getElementById('p-phase').value.trim(),status:document.getElementById('p-status').value,
+    startDate:document.getElementById('p-start').value,expEndDate:document.getElementById('p-exp-end').value,actEndDate:document.getElementById('p-act-end').value,
+    supportActive:document.getElementById('p-support-active').checked,supportStart:document.getElementById('p-support-start').value,supportEnd:document.getElementById('p-support-end').value,
+    assigned:assigned,holdReason:document.getElementById('p-hold-reason').value,delayReasons:selectedDelayReasons.slice(),
+    scopePlanned:document.getElementById('p-scope-planned').value.trim(),scopeAdded:document.getElementById('p-scope-added').value.trim(),
+    scopeLink:document.getElementById('p-scope-link').value.trim(),deps:document.getElementById('p-deps').value.trim(),notes:document.getElementById('p-notes').value.trim()};
+  if(editingProjId){var p=getProj(editingProjId);Object.assign(p,data);if(pendingScopeFile){p.scopeFileName=pendingScopeFile.name;p.scopeFileData=pendingScopeFile.data}addActivity('Updated: '+name)}
+  else{var np=Object.assign({id:uid(),blockers:[],hours:[],scopeFileName:'',scopeFileData:''},data);if(pendingScopeFile){np.scopeFileName=pendingScopeFile.name;np.scopeFileData=pendingScopeFile.data}P().push(np);addActivity('New project: '+name)}
+  saveDB();closeModal('proj-modal');renderProjects();updateSidebar();toast(editingProjId?'Project updated':'Project added','success');
+}
+function viewScopeFile(pid){var p=getProj(pid);if(!p||!p.scopeFileData)return;var w=window.open();w.document.write('<iframe src="'+p.scopeFileData+'" style="width:100%;height:100%;border:0"></iframe>')}
+
+/* ═══════════════ BLOCKER MODAL ═══════════════ */
+function openBlockerModal(pid){
+  document.getElementById('b-proj').innerHTML=P().map(function(p){return'<option value="'+p.id+'"'+(p.id===pid?' selected':'')+'>'+esc(p.name)+'</option>'}).join('');
+  document.getElementById('b-title').value='';document.getElementById('b-type').value='external';document.getElementById('b-since').value=today();document.getElementById('b-sla').value='3';document.getElementById('b-desc').value='';openModal('blk-modal');
+}
+function saveBlocker(){var title=document.getElementById('b-title').value.trim();if(!title)return toast('Title required','danger');var p=getProj(document.getElementById('b-proj').value);if(!p)return;
+  if(!p.blockers)p.blockers=[];p.blockers.push({id:uid(),title:title,type:document.getElementById('b-type').value,since:document.getElementById('b-since').value,sla:parseInt(document.getElementById('b-sla').value),desc:document.getElementById('b-desc').value.trim(),resolved:false});
+  addActivity('Blocker: '+title+' ('+p.name+')');saveDB();closeModal('blk-modal');renderPage(curPage());updateSidebar();toast('Blocker logged','warn');
+}
+
+/* ═══════════════ HOURS (inline modal reuse via prompt-free mini) ═══════════════ */
+var editingHoursProjId=null;
+function openHoursModal(pid){editingHoursProjId=pid;var d=prompt('Hours date (YYYY-MM-DD):',today());if(d===null)return;var hrs=parseFloat(prompt('Hours worked:','2'));if(!hrs||hrs<=0)return;var desc=prompt('Description:','')||'';var p=getProj(pid);var mid=(p.assigned[0]||(T()[0]||{}).id);
+  p.hours=p.hours||[];p.hours.push({id:uid(),date:d,hours:hrs,member:mid,desc:desc});addActivity('Logged '+hrs+'h on '+p.name);saveDB();renderProjects();toast('Hours logged','success');
+}
+
+/* ═══════════════ SCOPE MODAL ═══════════════ */
+function openScopeModal(){document.getElementById('sc-proj').innerHTML=P().map(function(p){return'<option value="'+p.id+'">'+esc(p.name)+'</option>'}).join('');document.getElementById('sc-title').value='';document.getElementById('sc-type').value='bug';document.getElementById('sc-sev').value='medium';document.getElementById('sc-notes').value='';openModal('scope-modal')}
+function saveScopeIssue(){var title=document.getElementById('sc-title').value.trim();if(!title)return toast('Title required','danger');
+  DB.scopeIssues.push({id:uid(),projectId:document.getElementById('sc-proj').value,title:title,type:document.getElementById('sc-type').value,severity:document.getElementById('sc-sev').value,date:today(),notes:document.getElementById('sc-notes').value.trim(),resolved:false});
+  addActivity('Issue logged: '+title);saveDB();closeModal('scope-modal');renderScope();updateSidebar();toast('Issue logged','success');
+}
+
+/* ═══════════════ REMINDER MODAL ═══════════════ */
+function openRemModal(){document.getElementById('r-text').value='';document.getElementById('r-date').value=today();document.getElementById('r-time').value='09:30';document.getElementById('r-cat').value='followup';document.getElementById('r-proj').innerHTML='<option value="">— None —</option>'+P().map(function(p){return'<option value="'+p.id+'">'+esc(p.name)+'</option>'}).join('');openModal('rem-modal')}
+function saveReminder(){var text=document.getElementById('r-text').value.trim();if(!text)return toast('Text required','danger');
+  DB.reminders.push({id:uid(),text:text,date:document.getElementById('r-date').value,time:document.getElementById('r-time').value,cat:document.getElementById('r-cat').value,projId:document.getElementById('r-proj').value,done:false});
+  saveDB();closeModal('rem-modal');renderReminders();updateSidebar();toast('Reminder added','success');
+}
+
+/* ═══════════════ TEAM MODAL ═══════════════ */
+var editingMemberId=null,selectedColor={bg:'#dbeafe',text:'#1d4ed8'};
+function openTeamModal(id){editingMemberId=id||null;var m=id?getMember(id):null;document.getElementById('team-modal-title').textContent=m?'Edit Member':'Add Team Member';
+  document.getElementById('tm-name').value=m?m.name:'';document.getElementById('tm-code').value=m?m.code:'';document.getElementById('tm-role').value=m?m.role:'Implementation Engineer';
+  selectedColor=m?{bg:m.bg,text:m.text}:{bg:'#dbeafe',text:'#1d4ed8'};openModal('team-modal');
+}
+function selectColor(el,bg,text){selectedColor={bg:bg,text:text};document.querySelectorAll('#color-picker div').forEach(function(d){d.style.borderColor='transparent'});el.style.borderColor=text}
+function saveMember(){var name=document.getElementById('tm-name').value.trim(),code=document.getElementById('tm-code').value.trim().toUpperCase().slice(0,3);if(!name||!code)return toast('Name and code required','danger');
+  var data={name:name,code:code,role:document.getElementById('tm-role').value,bg:selectedColor.bg,text:selectedColor.text};
+  if(editingMemberId){Object.assign(getMember(editingMemberId),data)}else{T().push(Object.assign({id:uid()},data));addActivity('Team member added: '+name)}
+  saveDB();closeModal('team-modal');renderTeam();toast('Saved','success');
+}
+function deleteMember(id){if(!confirm('Remove this member? They will be unassigned from all projects.'))return;DB.team=T().filter(function(m){return m.id!==id});P().forEach(function(p){p.assigned=p.assigned.filter(function(a){return a!==id})});saveDB();renderTeam();toast('Removed')}
+
+/* ═══════════════ MODAL/TOAST/BACKUP ═══════════════ */
+function openModal(id){document.getElementById(id).classList.add('open')}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+document.querySelectorAll('.modal-bg').forEach(function(el){el.addEventListener('click',function(e){if(e.target===el)el.classList.remove('open')})});
+function toast(msg,type){var t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;document.getElementById('toast-wrap').appendChild(t);requestAnimationFrame(function(){t.classList.add('show')});setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove()},300)},2400)}
+function exportBackup(){downloadTxt('command-center-backup-'+today()+'.json',JSON.stringify(DB,null,2));}
+
+/* ═══════════════ INIT ═══════════════ */
+document.getElementById('sb-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+loadDB(function(){renderDashboard();updateSidebar();});
+</script>
+</body>
+</html>
